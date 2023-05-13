@@ -202,7 +202,10 @@ class SSA:
         block_renamed_stored = {block.id: [] for block in all_blocks}
         block_renamed_loaded = {block.id: [] for block in all_blocks}
 
-        block_phi_assignments = {block.id: [] for block in all_blocks}
+        block_renamed_phi_stored = {block.id: [] for block in all_blocks}
+        block_renamed_phi_loaded = {block.id: [] for block in all_blocks}
+
+        block_phi_variables_needed = {block.id: [] for block in all_blocks}
 
         DF = self.compute_DF(all_blocks)
 
@@ -232,21 +235,36 @@ class SSA:
             affected_idents = []
             tmp_const_dict = block_const_dict[block.id]
 
+            # Preset variables for phi assignments in upcoming blocks
+            for phi_var in block_phi_variables_needed[block.id]:
+                if phi_var in ident_name_counter:
+                    ident_name_counter[phi_var] += 1
+                else:
+                    ident_name_counter[phi_var] = 0
+
+                stmt_renamed_stored = {}
+                stmt_renamed_stored[phi_var] = ident_name_counter[phi_var]
+                block_renamed_phi_stored[block.id] += [stmt_renamed_stored]
+                stmt_renamed_stored = {}
+                stmt_renamed_stored[phi_var] = self.recursive_find_var_usages_in_predecessors(phi_var, block_renamed_stored, block_renamed_phi_stored, block.predecessors)
+                block_renamed_phi_loaded[block.id] += [stmt_renamed_stored]
+
             # For each statement in the current block
             for i in range(n_stmts):
                 stmt_stored_idents = stored_idents[i]  # variables which are on the left side of an assignment etc.
                 stmt_loaded_idents = loaded_idents[i]  # variables which are on the right side of an assignment etc.
-                stmt_renamed_stored = {}
 
                 # Assign the renamed loaded variables as load names
                 # This has to happen before the stored variable renaming otherwise
                 # assignments to a variable depending on its old value are not working like b = b + 1
                 for ident in stmt_loaded_idents:
+                    stmt_renamed_stored = {}
                     # a list of dictionaries for each of idents used in this statement
                     phi_loaded_idents = block_renamed_loaded[block.id][i]
                     if ident in ident_name_counter:
                         phi_loaded_idents[ident].add(ident_name_counter[ident])
 
+                stmt_renamed_stored = {}
                 # Each statement assigning a value to a variable v has to increase the name counter for v
                 # so that there is no reassignment
                 # Assign the renamed stored variable names
@@ -274,8 +292,8 @@ class SSA:
                 block_ident_gen_produced = []
                 df_block_stored_idents = block_stored_idents[df_block_id]
                 for af_ident in affected_idents:
-                    if af_ident not in block_phi_assignments[df_block_id]:
-                        block_phi_assignments[df_block_id].append(af_ident)
+                    if af_ident not in block_phi_variables_needed[df_block_id]:
+                        block_phi_variables_needed[df_block_id].append(af_ident)
         #                    # this for-loop process every statement in the block
         #                    for idx, phi_loaded_idents in enumerate(block_renamed_loaded[df_block_id]):
         #                        block_ident_gen_produced.extend(df_block_stored_idents[idx])
@@ -288,6 +306,25 @@ class SSA:
         #                            phi_loaded_idents[af_ident].add(ident_name_counter[af_ident])
 
         return block_renamed_stored, block_renamed_loaded, ident_const_dict
+
+
+    def recursive_find_var_usages_in_predecessors(self, var_searched, block_renamed_stored, block_renamed_phi_stored, predecessors):
+        nrs = []
+        for pred in predecessors:
+            found = False
+            pred = pred.source
+            highest_nr = -1
+            for var_dict in block_renamed_stored[pred.id] + block_renamed_phi_stored[pred.id]:
+                for var in var_dict.keys():
+                    if var == var_searched:
+                        highest_nr = var_dict[var]
+
+            if highest_nr >= 0: # found an entry
+                nrs.append(highest_nr)
+            else:
+                nrs += self.recursive_find_var_usages_in_predecessors(var_searched, block_renamed_stored, block_renamed_phi_stored, pred.predecessors)
+        return nrs
+
 
     def get_stmt_idents_ctx(self, stmt, del_set=[], const_dict = {}):
         """
