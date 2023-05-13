@@ -1,0 +1,373 @@
+from __future__ import annotations
+import ast
+
+from src.scalpel.cfg import CFG
+import codegen
+
+from src.scalpel.core.mnode import MNode
+from src.scalpel.SSA.const import SSA
+
+
+
+
+class SSACode:
+
+    def __init__(self, cfg: CFG):
+        #pNode = ProcedureNodeP(VariableOrLabelNodeX('Name'),  VariableOrLabelListNodeXHead([]), BlockNodeB, procedure_after: ProcedureNodeP)
+        self.parse_cfg_to_SSA_code(cfg)
+
+    def parse_cfg(self, block):
+        for stmt in block.statements:
+            # New Function
+            if isinstance(stmt, ast.FunctionDef):
+                #print('Found Function')
+                print(codegen.to_source(stmt))
+
+            # New Class
+            elif isinstance(stmt, ast.ClassDef):
+                #print('Found Class')
+                print(codegen.to_source(stmt))
+
+            # Global assignments
+            elif isinstance(stmt, ast.Assign):
+                #print('Found assignment')
+                print(codegen.to_source(stmt))
+                pass
+
+            # Others
+            else:
+                pass
+
+    def parse_cfg_to_SSA_code(self, cfg: CFG):
+        self.parse_cfg_bfs([cfg.entryblock], 0)
+
+    def parse_cfg_bfs(self, blocks, depth):
+        next_blocks = []
+        print("Depth", depth)
+        for block in blocks:
+            self.parse_cfg(block)
+            if block.exits:
+                for exit in block.exits:
+                    next_blocks.append(exit.target)
+        if len(next_blocks) > 0:
+            self.parse_cfg_bfs(next_blocks, depth + 1)
+        # Id of the block.
+#        self.id = id
+        # Statements in the block.
+#        self.statements = []
+        # Calls to functions inside the block (represents context switches to
+        # some functions' CFGs).
+#        self.func_calls = []
+        # Links to predecessors in a control flow graph.
+#        self.predecessors = []
+        # Links to the next blocks in a control flow graph.
+#        self.exits = []
+
+
+class SSANode:
+    def __init__(self):
+        pass
+
+    def print(self, nesting_lvl):
+        return 'not implemented'
+
+
+class SSA_L(SSANode):
+    def __init__(self, label: str):
+        self.label: str = label
+
+    def print(self, lvl):
+        return f"{self.label}"
+
+
+class SSA_V(SSANode):
+    def __init__(self, value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL):
+        self.value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL = value
+
+    def print(self, lvl):
+        return f"{self.value.print(lvl)}"
+
+
+class SSA_V_CONST(SSANode):
+    def __init__(self, value: str):
+        self.value: str = value
+
+    def print(self, lvl):
+        return f"{self.value}"
+
+
+class SSA_V_VAR(SSANode):
+    def __init__(self, name: str):
+        self.name: str = name
+
+    def print(self, lvl):
+        return f"{self.name}"
+
+
+class SSA_V_FUNC_CALL(SSANode):
+    def __init__(self, name: SSA_L | SSA_V, args: SSA_V):
+        self.name: SSA_V_VAR = name
+        self.args = args
+
+    def print(self, lvl):
+        return f"{self.name.print(lvl) + print_args(self.args, lvl)}"
+
+
+class SSA_E(SSANode):
+    def __init__(self, term: SSA_E_ASS | SSA_E_ASS_PHI | SSA_E_GOTO | SSA_E_IF_ELSE | SSA_E_RET):
+        self.term: SSA_E_ASS | SSA_E_ASS_PHI | SSA_E_GOTO | SSA_E_IF_ELSE | SSA_E_RET = term
+
+    def print(self, lvl):
+        return "" # implemented in child nodes
+
+
+class SSA_E_ASS_PHI(SSANode):
+    def __init__(self, var: SSA_V, args: [SSA_V]):
+        self.var: SSA_V = var
+        self.args: [SSA_V] = args
+
+    def print(self, lvl):
+        return f"{self.var.print(lvl)+ ' <- PHI' + print_args(self.args, lvl)}"
+
+
+class SSA_E_ASS(SSANode):
+    def __init__(self, var: SSA_V, value: SSA_V):
+        self.var: SSA_V = var
+        self.value: SSA_V = value
+
+    def print(self, lvl):
+        return f"{self.var.print(lvl)+ ' <- ' + self.value.print(lvl)}"
+
+
+class SSA_E_GOTO(SSANode):
+    def __init__(self, label: SSA_L):
+        self.label: SSA_L = label
+
+    def print(self, lvl):
+        return f"{'goto L' + self.label.print(lvl)}"
+
+
+class SSA_E_RET(SSANode):
+    def __init__(self, func_call: SSA_V_FUNC_CALL):
+        self.func_call: SSA_V_FUNC_CALL = func_call
+
+    def print(self, lvl):
+        return f"ret {self.func_call.print(lvl)};"
+
+
+class SSA_E_IF_ELSE(SSANode):
+    def __init__(self, test: SSA_V, term_if: SSA_E, term_else: SSA_E):
+        self.test: SSA_V = test
+        self.term_if: SSA_E = term_if
+        self.term_else: SSA_E = term_else
+
+    def print(self, lvl):
+        new_line = '\n'
+        return f"{'if ' + self.test.print(lvl) + ' then ' + self.term_if.print(lvl) + new_line + get_indentation(lvl) + 'else ' + self.term_else.print(lvl)}"
+
+
+class SSA_B(SSANode):
+    def __init__(self, label: SSA_L, terms: [SSA_E]):
+        self.label: SSA_L = label
+        self.terms: [SSA_E] = terms
+
+    def print(self, lvl):
+        new_line = '\n'
+
+        if self.label.label == '1':
+            return print_terms(self.terms, lvl)
+        return get_indentation(lvl) + f"{'L' + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
+
+
+class SSA_P(SSANode):
+    def __init__(self, name: SSA_V_VAR, blocks: [SSA_B]):
+        self.name: SSA_V_VAR = name
+        self.blocks: [SSA_B] = blocks
+        self.blocks.sort(key=lambda x: x.label.label)
+
+    def print(self):
+        return 'proc ' + self.name.print(0) + '()\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}'
+
+
+class SSA_AST(SSANode):
+    def __init__(self, procs: [SSA_P], ret_term: SSA_E):
+        self.procs: [SSA_P] = procs
+        self.ret_term: [SSA_E] = ret_term
+
+    def print(self):
+        return '\n'.join([p.print() for p in self.procs]) + '\n' + self.ret_term.print(0)
+
+
+def print_args(args: [SSANode], lvl):
+    return '(' + ','.join([arg.print(lvl) for arg in args]) + ')'
+
+
+def print_terms(terms: [SSANode], lvl):
+    return ';\n'.join([(get_indentation(lvl) + term.print(lvl)) for term in terms if term is not None]) + ';'
+
+
+def get_indentation(nesting_lvl):
+    return '  ' * nesting_lvl
+
+
+def get_block_by_id(ssa_ast: SSA_AST, id: str) -> SSA_B:
+    for p in ssa_ast.procs:
+        for b in p.blocks:
+            if b.label == id:
+                return b
+    return None
+
+
+def get_phi_vars_in_block(b: SSA_B) -> [str]:
+    phi_vars = []
+    for e in b.terms:
+        if isinstance(e, SSA_E_ASS_PHI):
+            phi_vars.append(e.var)
+    return phi_vars
+
+
+def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B) -> [str]:
+    var_names = []
+    vars_for_jump = []
+
+    for e in b_from.terms:
+        if isinstance(e, SSA_E_ASS):
+            var_names.append(e.var.print(0))
+
+    for e in b_to.terms:
+        if isinstance(e, SSA_E_ASS_PHI):
+            for phi_var in e.args:
+                if phi_var.print(0) in var_names:
+                    vars_for_jump.append(phi_var)
+
+    return vars_for_jump
+
+
+
+
+block_counter = 1
+block_refs = {}
+ssa_results_stored = {}
+ssa_results_loads = {}
+const_dict = {}
+
+# TODO include functions - ssa only uses all under entry block
+def PY_to_SSA_AST(code_str: str):
+    global ssa_results_stored, ssa_results_loads, const_dict
+
+    mnode = MNode("local")
+    mnode.source = code_str
+    mnode.gen_ast()
+    cfg = mnode.gen_cfg()
+    m_ssa = SSA()
+
+    ssa_results_stored, ssa_results_loads, const_dict = m_ssa.compute_SSA2(cfg)
+
+    base_proc_name = "SSA_START_PROC"
+    proc = SSA_P(SSA_V_VAR(base_proc_name), PS_BS(None, cfg.get_all_blocks())) #+ PS_FS(cfg.functioncfgs))
+    ssa_ast = SSA_AST([proc], SSA_E_RET(SSA_V_FUNC_CALL(SSA_V_VAR(base_proc_name), [])))
+    return ssa_ast
+
+
+def PS_PHI(curr_block):
+
+    assignments = []
+    for stmt in ssa_results_loads[curr_block.id]:
+        for var_name in stmt:
+            var_values = list(map(str, list(stmt[var_name])))
+            if len(var_values) > 1:
+                print("added")
+                print("var_name",var_name)
+                print("var_values",var_values)
+                assignments.append(SSA_E_ASS_PHI(SSA_V_VAR(var_name + '_' + '_'.join(var_values)), [SSA_V_VAR(var_name + '_' + var) for var in var_values]))
+
+    return assignments
+
+
+def PS_FS(prov_info, curr_block, function_cfgs: [CFG]):
+    pass
+    # if len(function_cfgs) == 1:
+    #    return [SSA_B(function_cfgs[0].statements)]
+    # return [SSA_B(function_cfgs[0].statements)] + PS_FS(prov_info, curr_block, function_cfgs[1:])
+
+
+# blocks_checked = []
+
+
+def PS_BS(prov_info, blocks):
+    blocks_parsed = []
+    # Initialize block ids to have the same as in the parsed SSA / maybe change to block references instead of id
+    #for b in blocks:
+    #    PS_B_REF(prov_info, b)
+    for b in blocks:
+        blocks_parsed += PS_B(None, b)
+    return blocks_parsed
+
+
+def PS_B(prov_info, block):
+    global block_counter, blocks_checked
+
+    # if block in blocks_checked:
+    #    return []
+    # blocks_checked.append(block)
+    block_ref = PS_B_REF(prov_info, block)
+
+    stmts = PS_PHI(block)
+    stmts += [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements)]
+    if len(block.exits) == 1:
+        stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
+    b = SSA_B(block_ref, stmts)
+
+    if len(block.exits) == 0:
+        return [b]
+    #exits = reduce(lambda a, b: a+b, [PS_B(prov_info, exit_b.target) for exit_b in block.exits])
+    return [b]# + exits
+
+
+def PS_S(prov_info, curr_block, stmt, st_nr):
+    if isinstance(stmt, ast.Assign):
+        return SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True))
+    elif isinstance(stmt, ast.If):
+        if_ref = PS_B_REF(prov_info, curr_block.exits[0].target)
+        else_ref = PS_B_REF(prov_info, curr_block.exits[1].target)
+        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), SSA_E_GOTO(if_ref), SSA_E_GOTO(else_ref))
+    elif isinstance(stmt, ast.Expr):
+        return PS_E(prov_info, curr_block, stmt.value, st_nr, True)
+
+
+def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
+    if isinstance(stmt, ast.BinOp):
+        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
+    elif isinstance(stmt, ast.Call):
+        return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.func.id), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args])
+    elif isinstance(stmt, ast.Compare):
+        return PS_MAP2(prov_info, curr_block, PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), stmt.ops, stmt.comparators, st_nr)
+    elif isinstance(stmt, ast.Constant):
+        return SSA_V_CONST(stmt.value)
+    elif isinstance(stmt, ast.Name):
+        #print("Replace:",stmt.id,ssa_results_loads[curr_block.id])
+        #print("Replace:",stmt.id,ssa_results_stored[curr_block.id])
+        if is_load:
+            var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][stmt.id])]
+            var_list_join = str('_'.join(var_list))
+            return SSA_V_VAR(stmt.id + '_' + str(var_list_join))
+        return SSA_V_VAR(stmt.id + '_' + str(ssa_results_stored[curr_block.id][st_nr][stmt.id]))
+    return stmt
+
+
+def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
+    if len(ops) == 1:
+        return SSA_V_FUNC_CALL(SSA_V_VAR(type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
+    new_left = SSA_V_FUNC_CALL(SSA_V_VAR(type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
+    return PS_MAP2(new_left, ops[1:], comparators[1:], st_nr)
+
+
+def PS_B_REF(prov_info, curr_block):
+    global block_counter
+    if curr_block in block_refs:
+        return block_refs[curr_block]
+
+    #block_refs[curr_block] = SSA_L(str(block_counter))
+    block_refs[curr_block] = SSA_L(str(curr_block.id))
+    block_counter += 1
+    return block_refs[curr_block]

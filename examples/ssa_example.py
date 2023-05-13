@@ -5,8 +5,8 @@ import unittest
 
 import astor
 
-from scalpel.core.mnode import MNode
-from scalpel.SSA.const import SSA
+from src.scalpel.core.mnode import MNode
+from src.scalpel.SSA.const import SSA
 
 code_str = """
 b = 10

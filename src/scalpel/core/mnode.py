@@ -6,7 +6,7 @@ fine-grained operations.
 """
 import ast
 
-from scalpel.core.util import UnitWalker
+from src.scalpel.core.util import UnitWalker
 
 from ..cfg.builder import CFGBuilder
 from ..core.func_call_visitor import get_func_calls
