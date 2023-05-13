@@ -249,11 +249,13 @@ block_counter = 1
 block_refs = {}
 ssa_results_stored = {}
 ssa_results_loads = {}
+ssa_results_phi_stored = {}
+ssa_results_phi_loads = {}
 const_dict = {}
 
 # TODO include functions - ssa only uses all under entry block
 def PY_to_SSA_AST(code_str: str):
-    global ssa_results_stored, ssa_results_loads, const_dict
+    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
 
     mnode = MNode("local")
     mnode.source = code_str
@@ -261,7 +263,7 @@ def PY_to_SSA_AST(code_str: str):
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-    ssa_results_stored, ssa_results_loads, const_dict = m_ssa.compute_SSA2(cfg)
+    ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg)
 
     base_proc_name = "SSA_START_PROC"
     proc = SSA_P(SSA_V_VAR(base_proc_name), PS_BS(None, cfg.get_all_blocks())) #+ PS_FS(cfg.functioncfgs))
@@ -272,14 +274,11 @@ def PY_to_SSA_AST(code_str: str):
 def PS_PHI(curr_block):
 
     assignments = []
-    for stmt in ssa_results_loads[curr_block.id]:
-        for var_name in stmt:
-            var_values = list(map(str, list(stmt[var_name])))
-            if len(var_values) > 1:
-                print("added")
-                print("var_name",var_name)
-                print("var_values",var_values)
-                assignments.append(SSA_E_ASS_PHI(SSA_V_VAR(var_name + '_' + '_'.join(var_values)), [SSA_V_VAR(var_name + '_' + var) for var in var_values]))
+    for stored, loaded in zip(ssa_results_phi_stored[curr_block.id], ssa_results_phi_loads[curr_block.id]):
+        var_name = list(stored.keys())[0]
+        var_nr = str(stored[var_name])
+        var_values = list(map(str, list(loaded[var_name])))
+        assignments.append(SSA_E_ASS_PHI(SSA_V_VAR(var_name + '_' + var_nr), [SSA_V_VAR(var_name + '_' + var) for var in var_values]))
 
     return assignments
 

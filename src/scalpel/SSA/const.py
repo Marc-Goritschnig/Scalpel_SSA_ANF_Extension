@@ -305,7 +305,7 @@ class SSA:
         #                        if af_ident in phi_loaded_idents:
         #                            phi_loaded_idents[af_ident].add(ident_name_counter[af_ident])
 
-        return block_renamed_stored, block_renamed_loaded, ident_const_dict
+        return block_renamed_stored, block_renamed_loaded, block_renamed_phi_stored, block_renamed_phi_loaded, ident_const_dict
 
 
     def recursive_find_var_usages_in_predecessors(self, var_searched, block_renamed_stored, block_renamed_phi_stored, predecessors):

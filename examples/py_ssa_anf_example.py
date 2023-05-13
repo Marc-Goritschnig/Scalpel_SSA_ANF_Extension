@@ -27,7 +27,6 @@ else:
 
 
 if b>110:
-    a = a+b+c
     b = 2*a
 else:
     a = 10
@@ -72,7 +71,7 @@ def recursive_parse_cfg_trees_to_ssa(cfg: CFG, m_ssa: SSA):
     print(cfg.name)
     blocks = cfg.get_all_blocks
 
-    ssa_results_stored, ssa_results, const_dict = m_ssa.compute_SSA2(cfg)
+    ssa_results_stored, ssa_results, _, _, const_dict = m_ssa.compute_SSA2(cfg)
     for block_id, stmt_res in ssa_results.items():
         print("These are the results for block {}".format(block_id))
         print(stmt_res)
