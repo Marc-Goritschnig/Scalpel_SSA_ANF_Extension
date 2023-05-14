@@ -265,6 +265,12 @@ def PY_to_SSA_AST(code_str: str):
 
     ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg)
 
+    print('ssa_results_stored',ssa_results_stored)
+    print('ssa_results_loads',ssa_results_loads)
+    print('ssa_results_phi_stored',ssa_results_phi_stored)
+    print('ssa_results_phi_loads',ssa_results_phi_loads)
+    print('const_dict',const_dict)
+
     base_proc_name = "SSA_START_PROC"
     proc = SSA_P(SSA_V_VAR(base_proc_name), PS_BS(None, cfg.get_all_blocks())) #+ PS_FS(cfg.functioncfgs))
     ssa_ast = SSA_AST([proc], SSA_E_RET(SSA_V_FUNC_CALL(SSA_V_VAR(base_proc_name), [])))
@@ -327,6 +333,10 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
         return SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True))
     elif isinstance(stmt, ast.If):
+        if_ref = PS_B_REF(prov_info, curr_block.exits[0].target)
+        else_ref = PS_B_REF(prov_info, curr_block.exits[1].target)
+        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), SSA_E_GOTO(if_ref), SSA_E_GOTO(else_ref))
+    elif isinstance(stmt, ast.While):
         if_ref = PS_B_REF(prov_info, curr_block.exits[0].target)
         else_ref = PS_B_REF(prov_info, curr_block.exits[1].target)
         return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), SSA_E_GOTO(if_ref), SSA_E_GOTO(else_ref))

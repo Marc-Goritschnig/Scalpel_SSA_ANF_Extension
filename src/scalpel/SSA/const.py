@@ -226,6 +226,8 @@ class SSA:
 
             block_const_dict[block.id] = tmp_const_dict
 
+        self.lookup_phi_placements(DF, all_blocks, block_phi_variables_needed, block_stored_idents)
+
         # For each block
         for block in all_blocks:
             stored_idents = block_stored_idents[block.id]
@@ -235,7 +237,7 @@ class SSA:
             affected_idents = []
             tmp_const_dict = block_const_dict[block.id]
 
-            # Preset variables for phi assignments in upcoming blocks
+            # Preset store variables for phi assignments to have correct renaming numbering
             for phi_var in block_phi_variables_needed[block.id]:
                 if phi_var in ident_name_counter:
                     ident_name_counter[phi_var] += 1
@@ -245,9 +247,6 @@ class SSA:
                 stmt_renamed_stored = {}
                 stmt_renamed_stored[phi_var] = ident_name_counter[phi_var]
                 block_renamed_phi_stored[block.id] += [stmt_renamed_stored]
-                stmt_renamed_stored = {}
-                stmt_renamed_stored[phi_var] = self.recursive_find_var_usages_in_predecessors(phi_var, block_renamed_stored, block_renamed_phi_stored, block.predecessors)
-                block_renamed_phi_loaded[block.id] += [stmt_renamed_stored]
 
             # For each statement in the current block
             for i in range(n_stmts):
@@ -282,30 +281,39 @@ class SSA:
                     stmt_renamed_stored[ident] = ident_name_counter[ident]
                 block_renamed_stored[block.id] += [stmt_renamed_stored]
 
-            # Iterate over all DF blocks from the current one
-            # Check if one of those blocks contains a loading statement for a variable
-            # which was set in the current block
-            # If so then add the name counter for this to the load statement leading to phi assignments
+        # Set the loaded variable names for the phi assignments in all blocks
+        # This is done at last, to have all predecessors already initialized
+        for block in all_blocks:
+            stored_idents = block_stored_idents[block.id]
+            loaded_idents = block_loaded_idents[block.id]
+            n_stmts = len(stored_idents)
+            assert (n_stmts == len(loaded_idents))
+
+            # Preset variables for phi assignments in upcoming blocks
+            for phi_var in block_phi_variables_needed[block.id]:
+                stmt_renamed_loaded = {}
+                stmt_renamed_loaded[phi_var] = self.recursive_find_var_usages_in_predecessors(phi_var, block_renamed_stored, block_renamed_phi_stored, block.predecessors)
+                block_renamed_phi_loaded[block.id] += [stmt_renamed_loaded]
+
+        return block_renamed_stored, block_renamed_loaded, block_renamed_phi_stored, block_renamed_phi_loaded, ident_const_dict
+
+
+    def lookup_phi_placements(self, DF, all_blocks, block_phi_variables_needed, block_stored_idents):
+        for block in all_blocks:
+            stored_idents = block_stored_idents[block.id]
+            n_stmts = len(stored_idents)
+
+            affected_idents = []
+            for i in range(n_stmts):
+                stmt_stored_idents = stored_idents[i]  # variables which are on the left side of an assignment etc.
+                for ident in stmt_stored_idents:
+                    affected_idents.append(ident)
+
             df_block_ids = DF[block.id]
             for df_block_id in df_block_ids:
-                df_block = id2blocks[df_block_id]
-                block_ident_gen_produced = []
-                df_block_stored_idents = block_stored_idents[df_block_id]
                 for af_ident in affected_idents:
                     if af_ident not in block_phi_variables_needed[df_block_id]:
                         block_phi_variables_needed[df_block_id].append(af_ident)
-        #                    # this for-loop process every statement in the block
-        #                    for idx, phi_loaded_idents in enumerate(block_renamed_loaded[df_block_id]):
-        #                        block_ident_gen_produced.extend(df_block_stored_idents[idx])
-        #                        if af_ident in block_ident_gen_produced:
-        #                            continue
-        #                        # place phi function here this var used
-        #                        # if af_ident has been assigned in this block beforclee this statement, then discard it
-        #                        # so theck af_ident has been generated in this block
-        #                        if af_ident in phi_loaded_idents:
-        #                            phi_loaded_idents[af_ident].add(ident_name_counter[af_ident])
-
-        return block_renamed_stored, block_renamed_loaded, block_renamed_phi_stored, block_renamed_phi_loaded, ident_const_dict
 
 
     def recursive_find_var_usages_in_predecessors(self, var_searched, block_renamed_stored, block_renamed_phi_stored, predecessors):
@@ -558,3 +566,4 @@ class SSA:
         DF = nx.dominance_frontiers(G, entry_block.id)
         #idom = nx.immediate_dominators(G, entry_block.id)
         return DF
+

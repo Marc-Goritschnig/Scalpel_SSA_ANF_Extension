@@ -137,8 +137,8 @@ def SA_BS(bs: [SSA_B]):
 def SA_ES(b: SSA_B, terms: [SSA_E]):
     global buffer_variable_counter
 
+    if len(terms) == 0: return ANF_V_CONST('')
     term = terms[0]
-
     if term is None: return ANF_V_CONST('')
 
     if isinstance(term, SSA_E_ASS):
