@@ -127,7 +127,7 @@ class SSA_E_ASS_PHI(SSANode):
         self.args: [SSA_V] = args
 
     def print(self, lvl):
-        return self.var.print(lvl) + ' <- φ' + print_args(self.args, lvl)
+        return self.var.print(lvl) + ' ← φ' + print_args(self.args, lvl)
 
 
 class SSA_E_ASS(SSANode):
@@ -136,7 +136,7 @@ class SSA_E_ASS(SSANode):
         self.value: SSA_V = value
 
     def print(self, lvl):
-        return f"{self.var.print(lvl)+ ' <- ' + self.value.print(lvl)}"
+        return f"{self.var.print(lvl)+ ' ← ' + self.value.print(lvl)}"
 
 
 class SSA_E_GOTO(SSANode):
