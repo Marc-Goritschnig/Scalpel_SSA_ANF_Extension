@@ -36,12 +36,16 @@ class ANF_V_VAR(ANF_V):
 
 
 class ANF_V_FUNC(ANF_V):
-    def __init__(self, input_var: [ANF_V], term: ANF_E):
-        self.input_var: [ANF_V] = input_var
+    def __init__(self, input_var: ANF_V, term: ANF_E):
+        self.input_var: ANF_V = input_var
         self.term: ANF_E = term
 
     def print(self, lvl):
-        return f"λ{' '.join([in_var.print(0) for in_var in self.input_var])} . \n{self.term.print(lvl)}"
+        if self.input_var is None:
+            return f"λ . \n{self.term.print(lvl)}"
+        if isinstance(self.term, ANF_V_FUNC):
+            return f"λ{self.input_var.print(0)} . {self.term.print(lvl)}"
+        return f"λ{self.input_var.print(0)} . \n{self.term.print(lvl)}"
 
 
 class ANF_E(ANFNode):
@@ -58,7 +62,7 @@ class ANF_E_APP(ANF_E):
         self.name: ANF_V_VAR = name
 
     def print(self, lvl):
-        return get_indentation(lvl) + f"{' '.join([var.print(lvl) for var in self.params])}.{self.name.print(lvl)}"
+        return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
 
 class ANF_E_LET(ANF_E):
@@ -72,18 +76,14 @@ class ANF_E_LET(ANF_E):
 
 
 class ANF_E_LETREC(ANF_E):
-    def __init__(self, var: [ANF_V_FUNC], term1: [ANF_E], term2: ANF_E):
-        self.var: [ANF_V_FUNC] = var
-        self.term1: [ANF_E] = term1
+    def __init__(self, var: ANF_V_FUNC, term1: ANF_E, term2: ANF_E):
+        self.var: ANF_V_FUNC = var
+        self.term1: ANF_E = term1
         self.term2: ANF_E = term2
 
-    def add_entry(self, var: ANF_V_VAR, term1: ANF_E):
-        self.var.append(var)
-        self.term1.append(term1)
-
     def print(self, lvl):
-        assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
-        return '\n' + get_indentation(lvl) + 'letrec ' +'\n' + get_indentation(lvl + 1) + assignments + '\n' + get_indentation(lvl) + 'in \n' + self.term2.print(lvl + 1)
+        # assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
+        return get_indentation(lvl) + 'letrec ' +'\n' + get_indentation(lvl + 1) + self.var.print(lvl + 2) + ' = ' + self.term1.print(lvl+2) + '\n' + get_indentation(lvl) + 'in \n' + self.term2.print(lvl + 1)
 
 
 class ANF_E_IF(ANF_E):
@@ -97,7 +97,7 @@ class ANF_E_IF(ANF_E):
 
 
 def get_indentation(nesting_lvl):
-    return '|  ' * nesting_lvl
+    return '  ' * nesting_lvl
 
 
 def parse_ssa_to_anf(ssa: SSA_AST):
@@ -120,18 +120,33 @@ def SA_PS(ps: [SSA_P], ret_term: SSA_E_RET):
     #    let_rec.add_entry(SA_V(p.name), SA_BS(p.blocks))
     #return let_rec
     p: SSA_P = ps[0]
-    return SA_BS(p.blocks)
+    return SA_BS(p.blocks, ANF_E_APP([], SA_V(p.blocks[0].label)))
 
-def SA_BS(bs: [SSA_B]):
+def SA_BS(bs: [SSA_B], inner_call):
     b: SSA_B = bs[0]
     block_vars = [SA_V(phi_var)for phi_var in get_phi_vars_in_block(b)]
 
-    let_rec = ANF_E_LETREC([SA_V(b.label)], [ANF_V_FUNC(block_vars, SA_ES(b, b.terms))],
-                           ANF_E_APP([], SA_V(b.label)))
+    # Create self containing functions to build lambda functions in each other. leading to have functions with multiple variables
+    if len(block_vars) > 0:
+        func = ANF_V_FUNC(block_vars[0], SA_ES(b, b.terms))
+        block_vars = block_vars[1:]
 
-    for b in bs[1:]:
-        block_vars = [SA_V(phi_var) for phi_var in get_phi_vars_in_block(b)]
-        let_rec.add_entry(SA_V(b.label), ANF_V_FUNC(block_vars, SA_ES(b, b.terms)))
+        while len(block_vars) > 0:
+            func = ANF_V_FUNC(block_vars[0], func)
+            block_vars = block_vars[1:]
+    else:
+        func = ANF_V_FUNC(None, SA_ES(b, b.terms))
+
+    if len(bs) == 1:
+        let_rec = ANF_E_LETREC(SA_V(b.label), func,
+                               inner_call)
+    else:
+        let_rec = ANF_E_LETREC(SA_V(b.label), func,
+                           SA_BS(bs[1:], inner_call))
+
+    #for b in bs[1:]:
+    #    block_vars = [SA_V(phi_var) for phi_var in get_phi_vars_in_block(b)]
+    #    let_rec.add_entry(SA_V(b.label), ANF_V_FUNC(block_vars, SA_ES(b, b.terms)))
     return let_rec
 
 
@@ -154,8 +169,8 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
     if isinstance(term, SSA_E_IF_ELSE):
         return ANF_E_IF(SA_V(term.test), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else]))
     if isinstance(term, SSA_V_FUNC_CALL):
-        node = ANF_E_LET(ANF_V_VAR('zBuf' + str(buffer_variable_counter)), SA_V(term), SA_ES(b, terms[1:]))
         buffer_variable_counter += 1
+        node = ANF_E_LET(ANF_V_VAR('zBuf' + str(buffer_variable_counter-1)), SA_V(term), SA_ES(b, terms[1:]))
         return node
     print("not impl", term)
     return ANF_E_APP([], SA_V('terms'))
