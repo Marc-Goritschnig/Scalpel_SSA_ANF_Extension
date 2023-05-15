@@ -12,31 +12,25 @@ code_str = """
 b = 10
 a = 1
 b=1 + b
-v = b
-c = 3
-#z = {'a':1, 'b': 2}
-#zz = z['a']
+
 if b>110:
-    a = a+b+c
-    #b = 2*a
+    a = a+b
+    b = 2*a
 else:
     a = 10
-
 
 print(a)
 print(b)
 
-def aaa(b):
-    b = b + 1
-    print(b)
 """
 
 
 code_str2 = """
-a = 0
-while a < 10:
-    a = a + 1
-print(a)
+a = [1,2,3,4,5]
+i = 0
+while i < len(a):
+    print(a[i])
+
 """
 
 cc = """
@@ -69,7 +63,7 @@ def toSSA_and_print():
     m_ssa = SSA()
 
 
-    ssa_ast = PY_to_SSA_AST(code_str2)
+    ssa_ast = PY_to_SSA_AST(code_str)
     print()
     print(ssa_ast.print())
 

@@ -113,13 +113,14 @@ def SA(ssa_ast: SSA_AST):
 
 
 def SA_PS(ps: [SSA_P], ret_term: SSA_E_RET):
+    #p: SSA_P = ps[0]
+    #let_rec = ANF_E_LETREC([SA_V(p.name)], [SA_BS(p.blocks)], ANF_E_APP([], SA_V(ret_term.func_call.name)))
+
+    #for p in ps[1:]:
+    #    let_rec.add_entry(SA_V(p.name), SA_BS(p.blocks))
+    #return let_rec
     p: SSA_P = ps[0]
-    let_rec = ANF_E_LETREC([SA_V(p.name)], [SA_BS(p.blocks)], ANF_E_APP([], SA_V(ret_term.func_call.name)))
-
-    for p in ps[1:]:
-        let_rec.add_entry(SA_V(p.name), SA_BS(p.blocks))
-    return let_rec
-
+    return SA_BS(p.blocks)
 
 def SA_BS(bs: [SSA_B]):
     b: SSA_B = bs[0]

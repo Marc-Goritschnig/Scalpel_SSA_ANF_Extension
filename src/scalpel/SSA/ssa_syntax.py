@@ -127,7 +127,7 @@ class SSA_E_ASS_PHI(SSANode):
         self.args: [SSA_V] = args
 
     def print(self, lvl):
-        return f"{self.var.print(lvl)+ ' <- PHI' + print_args(self.args, lvl)}"
+        return self.var.print(lvl) + ' <- φ' + print_args(self.args, lvl)
 
 
 class SSA_E_ASS(SSANode):
@@ -152,6 +152,8 @@ class SSA_E_RET(SSANode):
         self.func_call: SSA_V_FUNC_CALL = func_call
 
     def print(self, lvl):
+        if self.func_call is None:
+            return 'ret'
         return f"ret {self.func_call.print(lvl)};"
 
 
@@ -186,7 +188,8 @@ class SSA_P(SSANode):
         self.blocks.sort(key=lambda x: x.label.label)
 
     def print(self):
-        return 'proc ' + self.name.print(0) + '()\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}'
+        return '\n\n'.join([b.print(0) for b in self.blocks])
+        # return 'proc ' + self.name.print(0) + '()\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}'
 
 
 class SSA_AST(SSANode):
@@ -195,7 +198,7 @@ class SSA_AST(SSANode):
         self.ret_term: [SSA_E] = ret_term
 
     def print(self):
-        return '\n'.join([p.print() for p in self.procs]) + '\n' + self.ret_term.print(0)
+        return '\n'.join([p.print() for p in self.procs])  # + '\n' + self.ret_term.print(0)
 
 
 def print_args(args: [SSANode], lvl):
@@ -333,13 +336,19 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
         return SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True))
     elif isinstance(stmt, ast.If):
-        if_ref = PS_B_REF(prov_info, curr_block.exits[0].target)
-        else_ref = PS_B_REF(prov_info, curr_block.exits[1].target)
-        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), SSA_E_GOTO(if_ref), SSA_E_GOTO(else_ref))
+        if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
+        if len(curr_block.exits) == 1:
+            else_ref = SSA_E_RET(None)
+        else:
+            else_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[1].target))
+        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), if_ref, else_ref)
     elif isinstance(stmt, ast.While):
-        if_ref = PS_B_REF(prov_info, curr_block.exits[0].target)
-        else_ref = PS_B_REF(prov_info, curr_block.exits[1].target)
-        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), SSA_E_GOTO(if_ref), SSA_E_GOTO(else_ref))
+        if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
+        if len(curr_block.exits) == 1:
+            else_ref = SSA_E_RET(None)
+        else:
+            else_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[1].target))
+        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), if_ref, else_ref)
     elif isinstance(stmt, ast.Expr):
         return PS_E(prov_info, curr_block, stmt.value, st_nr, True)
 
