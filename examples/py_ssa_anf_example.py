@@ -9,18 +9,11 @@ graphviz_path = 'C:/Program Files/Graphviz/bin'
 os.environ["PATH"] += os.pathsep + graphviz_path
 
 code_str = """
+def aaa():
+    print('123')
+    
 b = 10
-a = 1
-b=1 + b
-
-if b>110:
-    a = a+b
-    b = 2*a
-else:
-    a = 10
-
-print(a)
-print(b)
+aaa()
 
 """
 
@@ -32,7 +25,36 @@ while i < len(a):
     print(a[i])
 
 """
+ccc="""
+def IsEasyChairQuery(input: str) -> bool:
+    # (1) check that input contains "/" followed by anything not
+    # containing "/" and containing "EasyChair"
+    lastSlash = input.rindex('/')
+    if lastSlash < 0:
+        return False
+    rest = input[lastSlash + 1:]
+    if "EasyChair" not in rest:
+        return False
+    # (2) Check that input starts with "http://"
+    if not input.startswith("http://"):
+        return False
+    # (3) Take the string between "http://" and the last "/".
+    # if it starts with "www." strip the "www." off
+    t = input[len("http://"): lastSlash]
+    if t.startswith("www."):
+        t = t[len("www.")]
+    # (4) Check that after stripping we have either "live.com"
+    # or "google.com"
+    if t != "live.com" and t != "google.com":
+        return False
+    # s survived all checks
+    return True
+IsEasyChairQuery('test')
 
+a = 1
+print(a)
+print(a)
+"""
 cc = """
 def fib():
     a = 0
@@ -76,6 +98,38 @@ def toSSA_and_print():
     cfg.build_visual('./output/exampleCFG', 'pdf')
 
 
+def IsEasyChairQuery(input: str) -> bool:
+    # (1) check that input contains "/" followed by anything not
+    # containing "/" and containing "EasyChair"
+    lastSlash = input.rindex('/')
+    if lastSlash < 0:
+        return False
+    rest = input[lastSlash + 1:]
+    if "EasyChair" not in rest:
+        return False
+    # (2) Check that input starts with "http://"
+    if not input.startswith("http://"):
+        return False
+    # (3) Take the string between "http://" and the last "/".
+    # if it starts with "www." strip the "www." off
+    t = input[len("http://"): lastSlash]
+    if t.startswith("www."):
+        t = t[len("www.")]
+    # (4) Check that after stripping we have either "live.com"
+    # or "google.com"
+    if t != "live.com" and t != "google.com":
+        return False
+    # s survived all checks
+    return True
+
+
+
 if __name__ == '__main__':
     # main()
     toSSA_and_print()
+    #print(IsEasyChairQuery("http://live.com/EasyChair"))
+    #print(IsEasyChairQuery("http://www.live.com"))
+    #print(IsEasyChairQuery("http://www.live.com/sedrgerg/sdfsefes/EasyChair"))
+    #print(IsEasyChairQuery("https://www.live.com/sedrgerg/sdfsefes/EasyChair"))
+    #print(IsEasyChairQuery("http://www.livecom/sedrgerg/sdfsefes/EasyChair"))
+

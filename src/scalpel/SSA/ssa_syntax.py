@@ -169,14 +169,15 @@ class SSA_E_IF_ELSE(SSANode):
 
 
 class SSA_B(SSANode):
-    def __init__(self, label: SSA_L, terms: [SSA_E]):
+    def __init__(self, label: SSA_L, terms: [SSA_E], first_in_proc: bool):
         self.label: SSA_L = label
         self.terms: [SSA_E] = terms
+        self.first_in_proc: bool = first_in_proc
 
     def print(self, lvl):
         new_line = '\n'
 
-        if self.label.label == '1':
+        if self.first_in_proc:
             return print_terms(self.terms, lvl)
         return get_indentation(lvl) + f"{'L' + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
 
@@ -188,17 +189,17 @@ class SSA_P(SSANode):
         self.blocks.sort(key=lambda x: x.label.label)
 
     def print(self):
-        return '\n\n'.join([b.print(0) for b in self.blocks])
-        # return 'proc ' + self.name.print(0) + '()\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}'
+        # return '\n\n'.join([b.print(0) for b in self.blocks])
+        return 'proc ' + self.name.print(0) + '()\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}\n'
 
 
 class SSA_AST(SSANode):
-    def __init__(self, procs: [SSA_P], ret_term: SSA_E):
+    def __init__(self, procs: [SSA_P], blocks: [SSA_B]):
         self.procs: [SSA_P] = procs
-        self.ret_term: [SSA_E] = ret_term
+        self.blocks: [SSA_B] = blocks
 
     def print(self):
-        return '\n'.join([p.print() for p in self.procs])  # + '\n' + self.ret_term.print(0)
+        return '\n'.join([p.print() for p in self.procs]) + '\n\n'.join([b.print(0) for b in self.blocks]) # + '\n' + self.ret_term.print(0)
 
 
 def print_args(args: [SSANode], lvl):
@@ -266,8 +267,8 @@ def PY_to_SSA_AST(code_str: str):
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
+    procs = PS_FS(None, cfg.functioncfgs, m_ssa)
     ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg)
-
     print('ssa_results_stored',ssa_results_stored)
     print('ssa_results_loads',ssa_results_loads)
     print('ssa_results_phi_stored',ssa_results_phi_stored)
@@ -275,8 +276,8 @@ def PY_to_SSA_AST(code_str: str):
     print('const_dict',const_dict)
 
     base_proc_name = "SSA_START_PROC"
-    proc = SSA_P(SSA_V_VAR(base_proc_name), PS_BS(None, cfg.get_all_blocks())) #+ PS_FS(cfg.functioncfgs))
-    ssa_ast = SSA_AST([proc], SSA_E_RET(SSA_V_FUNC_CALL(SSA_V_VAR(base_proc_name), [])))
+    # proc = SSA_P(SSA_V_VAR(base_proc_name), ) #+ PS_FS(cfg.functioncfgs))
+    ssa_ast = SSA_AST(procs, PS_BS(None, cfg.get_all_blocks()))
     return ssa_ast
 
 
@@ -292,11 +293,15 @@ def PS_PHI(curr_block):
     return assignments
 
 
-def PS_FS(prov_info, curr_block, function_cfgs: [CFG]):
-    pass
-    # if len(function_cfgs) == 1:
-    #    return [SSA_B(function_cfgs[0].statements)]
-    # return [SSA_B(function_cfgs[0].statements)] + PS_FS(prov_info, curr_block, function_cfgs[1:])
+def PS_FS(prov_info, function_cfgs, m_ssa):
+    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
+    procs = []
+    for key in function_cfgs:
+        cfg = function_cfgs[key]
+        ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(
+            cfg)
+        procs.append(SSA_P(SSA_V_VAR(cfg.name), PS_BS(prov_info, cfg.get_all_blocks())))
+    return procs
 
 
 # blocks_checked = []
@@ -307,12 +312,14 @@ def PS_BS(prov_info, blocks):
     # Initialize block ids to have the same as in the parsed SSA / maybe change to block references instead of id
     #for b in blocks:
     #    PS_B_REF(prov_info, b)
+    i = 0
     for b in blocks:
-        blocks_parsed += PS_B(None, b)
+        blocks_parsed += PS_B(None, b, i == 0)
+        i += 1
     return blocks_parsed
 
 
-def PS_B(prov_info, block):
+def PS_B(prov_info, block, first_in_proc):
     global block_counter, blocks_checked
 
     # if block in blocks_checked:
@@ -321,10 +328,10 @@ def PS_B(prov_info, block):
     block_ref = PS_B_REF(prov_info, block)
 
     stmts = PS_PHI(block)
-    stmts += [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements)]
+    stmts += [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements) if not isinstance(stmt, ast.FunctionDef)]
     if len(block.exits) == 1:
         stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
-    b = SSA_B(block_ref, stmts)
+    b = SSA_B(block_ref, stmts, first_in_proc)
 
     if len(block.exits) == 0:
         return [b]
