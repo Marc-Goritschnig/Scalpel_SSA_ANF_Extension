@@ -203,7 +203,7 @@ class SSA_AST(SSANode):
 
 
 def print_args(args: [SSANode], lvl):
-    return '(' + ','.join([arg.print(lvl) for arg in args]) + ')'
+    return '(' + ', '.join([arg.print(lvl) for arg in args]) + ')'
 
 
 def print_terms(terms: [SSANode], lvl):
@@ -217,8 +217,11 @@ def get_indentation(nesting_lvl):
 def get_block_by_id(ssa_ast: SSA_AST, id: str) -> SSA_B:
     for p in ssa_ast.procs:
         for b in p.blocks:
-            if b.label == id:
+            if b.label.label == id:
                 return b
+    for b in ssa_ast.blocks:
+        if b.label.label == id:
+            return b
     return None
 
 
@@ -363,19 +366,41 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if isinstance(stmt, ast.BinOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
+    elif isinstance(stmt, ast.BoolOp): # TODO
+        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.values[0], st_nr, is_load), PS_E(prov_info, curr_block, stmt.values[1], st_nr, is_load)])
+    elif isinstance(stmt, ast.UnaryOp):  # TODO
+        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)])
     elif isinstance(stmt, ast.Call):
-        return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.func.id), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args])
+        return SSA_V_FUNC_CALL(PS_E(prov_info, curr_block, stmt.func, st_nr, is_load), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args])
     elif isinstance(stmt, ast.Compare):
         return PS_MAP2(prov_info, curr_block, PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), stmt.ops, stmt.comparators, st_nr)
     elif isinstance(stmt, ast.Constant):
+        if isinstance(stmt.value, str):
+            return SSA_V_CONST("'" + stmt.value + "'")
+        else:
+            return SSA_V_CONST(stmt.value)
+    elif isinstance(stmt, ast.Slice):
         return SSA_V_CONST(stmt.value)
+    elif isinstance(stmt, ast.Dict):
+        return SSA_V_FUNC_CALL(SSA_V_VAR('new_dict_' + str(len(stmt.keys))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for args in zip(stmt.keys, stmt.values) for arg in args])
+    elif isinstance(stmt, ast.Set):
+        return SSA_V_FUNC_CALL(SSA_V_VAR('new_set_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
+    elif isinstance(stmt, ast.List):
+        return SSA_V_FUNC_CALL(SSA_V_VAR('new_list_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
+    elif isinstance(stmt, ast.Subscript):
+        if isinstance(stmt.slice, ast.Slice):
+            return SSA_V_FUNC_CALL(SSA_V_VAR('List_Slice'), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]))
+        else:
+            return SSA_V_FUNC_CALL(SSA_V_VAR('LSD_Get'), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + [PS_E(prov_info, curr_block, stmt.slice, st_nr, is_load)])
+    elif isinstance(stmt, ast.Attribute):
+        return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.attr), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)])
     elif isinstance(stmt, ast.Name):
-        #print("Replace:",stmt.id,ssa_results_loads[curr_block.id])
-        #print("Replace:",stmt.id,ssa_results_stored[curr_block.id])
         if is_load:
-            var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][stmt.id])]
-            var_list_join = str('_'.join(var_list))
-            return SSA_V_VAR(stmt.id + '_' + str(var_list_join))
+            if stmt.id in ssa_results_loads[curr_block.id][st_nr]:
+                var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][stmt.id])]
+                var_list_join = str('_'.join(var_list))
+                return SSA_V_VAR(stmt.id + '_' + str(var_list_join))
+            return SSA_V_VAR(stmt.id)
         return SSA_V_VAR(stmt.id + '_' + str(ssa_results_stored[curr_block.id][st_nr][stmt.id]))
     return stmt
 

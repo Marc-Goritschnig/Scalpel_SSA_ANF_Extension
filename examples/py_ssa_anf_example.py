@@ -11,10 +11,21 @@ os.environ["PATH"] += os.pathsep + graphviz_path
 code_str = """
 def aaa():
     print('123')
-    
+
 b = 10
 aaa()
 
+"""
+
+code_str3 = """
+a = 10
+b = 5
+
+if b < 10:
+    a = a + 2
+else:
+    a = 2
+print(a)
 """
 
 
@@ -76,7 +87,16 @@ for x in range(1, 5):
         s.append(x)
 """
 
+testc = """
+a = a[len([2,3,4,4])]
+a = [1,2,3]
+b = {1,2,3}
+c = {'A': 1, 'B': 2}
 
+x = a[1]
+x = b[:2]
+x = c['A']
+"""
 def toSSA_and_print():
     mnode = MNode("local")
     mnode.source = code_str
@@ -85,7 +105,9 @@ def toSSA_and_print():
     m_ssa = SSA()
 
 
-    ssa_ast = PY_to_SSA_AST(code_str)
+    # TODO: SSA should only have distinct variables globally, therefore change variable names
+
+    ssa_ast = PY_to_SSA_AST(ccc)
     print()
     print(ssa_ast.print())
 

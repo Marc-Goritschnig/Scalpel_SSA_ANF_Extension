@@ -70,7 +70,7 @@ class ANF_E_APP(ANF_E):
         self.name: ANF_V_VAR = name
 
     def print(self, lvl):
-        return get_indentation(lvl) + f"{self.name.print(lvl)}({' '.join([var.print(lvl) for var in self.params])})"
+        return get_indentation(lvl) + f"{self.name.print(lvl)}({', '.join([var.print(lvl) for var in self.params])})"
 
 
 class ANF_E_LET(ANF_E):
@@ -124,10 +124,11 @@ def SA(ssa_ast: SSA_AST):
 
 
 def SA_PS(ps: [SSA_P], inner_term):
-    p: SSA_P = ps[0]
     if len(ps) == 0:
         return inner_term
-    elif len(ps) == 1:
+
+    p: SSA_P = ps[0]
+    if len(ps) == 1:
         let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(p.blocks[0].label.label))), inner_term)
     else:
         let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(p.blocks[0].label.label))), SA_PS[1:])
@@ -174,8 +175,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
     if isinstance(term, SSA_E_ASS):
         return ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:]))
     if isinstance(term, SSA_E_GOTO):
-        print(get_block_by_id(ssa_ast_global, term.label).label.print(0))
-        return ANF_E_APP(get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label)), SA_V(term.label))
+        return ANF_E_APP(get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label)), SA_V(term.label))
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
     if isinstance(term, SSA_E_RET):
