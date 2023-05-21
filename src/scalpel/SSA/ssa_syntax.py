@@ -72,14 +72,6 @@ class SSANode:
         return 'not implemented'
 
 
-class SSA_L(SSANode):
-    def __init__(self, label: str):
-        self.label: str = label
-
-    def print(self, lvl):
-        return f"{self.label}"
-
-
 class SSA_V(SSANode):
     def __init__(self, value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL):
         self.value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL = value
@@ -88,7 +80,15 @@ class SSA_V(SSANode):
         return f"{self.value.print(lvl)}"
 
 
-class SSA_V_CONST(SSANode):
+class SSA_L(SSA_V):
+    def __init__(self, label: str):
+        self.label: str = label
+
+    def print(self, lvl):
+        return f"{self.label}"
+
+
+class SSA_V_CONST(SSA_V):
     def __init__(self, value: str):
         self.value: str = value
 
@@ -96,7 +96,7 @@ class SSA_V_CONST(SSANode):
         return f"{self.value}"
 
 
-class SSA_V_VAR(SSANode):
+class SSA_V_VAR(SSA_V):
     def __init__(self, name: str):
         self.name: str = name
 
@@ -104,7 +104,7 @@ class SSA_V_VAR(SSANode):
         return f"{self.name}"
 
 
-class SSA_V_FUNC_CALL(SSANode):
+class SSA_V_FUNC_CALL(SSA_V):
     def __init__(self, name: SSA_L | SSA_V, args: SSA_V):
         self.name: SSA_V_VAR = name
         self.args = args
@@ -121,7 +121,7 @@ class SSA_E(SSANode):
         return "" # implemented in child nodes
 
 
-class SSA_E_ASS_PHI(SSANode):
+class SSA_E_ASS_PHI(SSA_E):
     def __init__(self, var: SSA_V, args: [SSA_V]):
         self.var: SSA_V = var
         self.args: [SSA_V] = args
@@ -130,7 +130,7 @@ class SSA_E_ASS_PHI(SSANode):
         return self.var.print(lvl) + ' ← φ' + print_args(self.args, lvl)
 
 
-class SSA_E_ASS(SSANode):
+class SSA_E_ASS(SSA_E):
     def __init__(self, var: SSA_V, value: SSA_V):
         self.var: SSA_V = var
         self.value: SSA_V = value
@@ -139,7 +139,7 @@ class SSA_E_ASS(SSANode):
         return f"{self.var.print(lvl)+ ' ← ' + self.value.print(lvl)}"
 
 
-class SSA_E_GOTO(SSANode):
+class SSA_E_GOTO(SSA_E):
     def __init__(self, label: SSA_L):
         self.label: SSA_L = label
 
@@ -147,17 +147,17 @@ class SSA_E_GOTO(SSANode):
         return f"{'goto L' + self.label.print(lvl)}"
 
 
-class SSA_E_RET(SSANode):
-    def __init__(self, func_call: SSA_V_FUNC_CALL):
-        self.func_call: SSA_V_FUNC_CALL = func_call
+class SSA_E_RET(SSA_E):
+    def __init__(self, value: SSA_V):
+        self.value: SSA_V = value
 
     def print(self, lvl):
-        if self.func_call is None:
+        if self.value is None:
             return 'ret'
-        return f"ret {self.func_call.print(lvl)};"
+        return f"ret {self.value.print(lvl)}"
 
 
-class SSA_E_IF_ELSE(SSANode):
+class SSA_E_IF_ELSE(SSA_E):
     def __init__(self, test: SSA_V, term_if: SSA_E, term_else: SSA_E):
         self.test: SSA_V = test
         self.term_if: SSA_E = term_if
@@ -361,17 +361,22 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), if_ref, else_ref)
     elif isinstance(stmt, ast.Expr):
         return PS_E(prov_info, curr_block, stmt.value, st_nr, True)
+    elif isinstance(stmt, ast.Return):
+        return SSA_E_RET(PS_E(prov_info, curr_block, stmt.value, st_nr, True))
 
 
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if isinstance(stmt, ast.BinOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
     elif isinstance(stmt, ast.BoolOp): # TODO
-        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.values[0], st_nr, is_load), PS_E(prov_info, curr_block, stmt.values[1], st_nr, is_load)])
+        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values])
     elif isinstance(stmt, ast.UnaryOp):  # TODO
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)])
     elif isinstance(stmt, ast.Call):
-        return SSA_V_FUNC_CALL(PS_E(prov_info, curr_block, stmt.func, st_nr, is_load), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args])
+        if isinstance(stmt.func, ast.Attribute):
+            return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.func.attr), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in ([stmt.func.value] + stmt.args)])
+        else:
+            return SSA_V_FUNC_CALL(PS_E(prov_info, curr_block, stmt.func, st_nr, is_load), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args])
     elif isinstance(stmt, ast.Compare):
         return PS_MAP2(prov_info, curr_block, PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), stmt.ops, stmt.comparators, st_nr)
     elif isinstance(stmt, ast.Constant):
@@ -389,7 +394,16 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         return SSA_V_FUNC_CALL(SSA_V_VAR('new_list_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
     elif isinstance(stmt, ast.Subscript):
         if isinstance(stmt.slice, ast.Slice):
-            return SSA_V_FUNC_CALL(SSA_V_VAR('List_Slice'), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]))
+            appendix = ""
+            if stmt.slice.lower is not None:
+                appendix += "L"
+            if stmt.slice.upper is not None:
+                appendix += "U"
+            if stmt.slice.step is not None:
+                appendix += "S"
+            if len(appendix) > 0:
+                appendix = "_" + appendix
+            return SSA_V_FUNC_CALL(SSA_V_VAR('List_Slice' + appendix), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]))
         else:
             return SSA_V_FUNC_CALL(SSA_V_VAR('LSD_Get'), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + [PS_E(prov_info, curr_block, stmt.slice, st_nr, is_load)])
     elif isinstance(stmt, ast.Attribute):

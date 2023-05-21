@@ -50,8 +50,10 @@ class ANF_V_FUNC(ANF_V):
 
     def print(self, lvl):
         if self.input_var is None:
+            if issubclass(type(self.term), ANF_V):
+                return f"λ . {self.term.print(lvl)}"
             return f"λ . \n{self.term.print(lvl)}"
-        if isinstance(self.term, ANF_V_FUNC):
+        if issubclass(type(self.term), ANF_V):
             return f"λ{self.input_var.print(0)} . {self.term.print(lvl)}"
         return f"λ{self.input_var.print(0)} . \n{self.term.print(lvl)}"
 
@@ -166,27 +168,50 @@ def SA_BS(bs: [SSA_B], inner_call):
 
 
 def SA_ES(b: SSA_B, terms: [SSA_E]):
-    global buffer_variable_counter
 
     if len(terms) == 0: return ANF_V_UNIT()
     term = terms[0]
     if term is None: return ANF_V_UNIT()
 
     if isinstance(term, SSA_E_ASS):
-        return ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:]))
+        unwrap_inner_applications_naming(term.value)
+        return unwrap_inner_applications_let_structure(term.value, ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:])))
     if isinstance(term, SSA_E_GOTO):
         return ANF_E_APP(get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label)), SA_V(term.label))
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
     if isinstance(term, SSA_E_RET):
-        return SA_V(term.func_call)
+        unwrap_inner_applications_naming(term.value)
+        return unwrap_inner_applications_let_structure(term.value, SA_V(term.value))
     if isinstance(term, SSA_E_IF_ELSE):
-        return ANF_E_IF(SA_V(term.test), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else]))
-    if isinstance(term, SSA_V_FUNC_CALL):
-        node = ANF_E_LET(ANF_V_VAR('_'), SA_V(term), SA_ES(b, terms[1:]))
-        return node
+        unwrap_inner_applications_naming(term.test)
+        return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else])))
+    #if isinstance(term, SSA_V_FUNC_CALL):
+    #    unwrap_inner_applications_naming(term.test)
+    #    return unwrap_inner_applications_let_structure(ANF_E_LET(ANF_V_VAR('_'), SA_V(term), SA_ES(b, terms[1:])))
+    if issubclass(type(term), SSA_V):
+        return SA_V(term)
     print("not impl", term)
     return ANF_E_APP([], SA_V('terms'))
+
+
+def unwrap_inner_applications_let_structure(var: SSA_V, inner):
+    if isinstance(var, SSA_V_FUNC_CALL):
+        for arg in var.args:
+            if isinstance(arg, SSA_V_FUNC_CALL):
+                name = buffer_assignments[arg]
+                inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name), SA_V(arg), inner))
+    return inner
+
+
+def unwrap_inner_applications_naming(var: SSA_V):
+    if isinstance(var, SSA_V_FUNC_CALL):
+        for arg in var.args:
+            if isinstance(arg, SSA_V_FUNC_CALL):
+                name = get_buffer_variable()
+                buffer_assignments[arg] = name
+                unwrap_inner_applications_naming(arg)
+
 
 def SA_V(var: SSA_V):
     if isinstance(var, SSA_V_VAR):
@@ -196,5 +221,15 @@ def SA_V(var: SSA_V):
     if isinstance(var, SSA_L):
         return ANF_V_CONST(var.label)
     if isinstance(var, SSA_V_FUNC_CALL):
-        return ANF_E_APP([SA_V(par) for par in var.args], SA_V(var.name))
+        return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par]) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name))
+
     return ANF_V_CONST('Not impl')
+
+
+def get_buffer_variable():
+    global buffer_variable_counter
+    buffer_variable_counter += 1
+    return '_buffer_' + str(buffer_variable_counter - 1)
+
+
+buffer_assignments = {}

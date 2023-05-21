@@ -172,7 +172,7 @@ class SSA:
 
         return block_renamed_loaded, ident_const_dict
 
-    def compute_SSA2(self, cfg):
+    def compute_SSA2(self, cfg, used_variable_names = []):
         """
         Compute single static assignment form representations for a given CFG.
         During the computing, constant value and alias pairs are generated. The following steps are used to compute SSA representations:
@@ -334,7 +334,7 @@ class SSA:
         return nrs
 
 
-    def get_stmt_idents_ctx(self, stmt, del_set=[], const_dict = {}):
+    def get_stmt_idents_ctx(self, stmt, del_set=[], const_dict = {}, used_var_names = {}):
         """
         Extract the contextual information of each of identifiers.
         For assignment statements, the assigned values for each of variables will be stored.
@@ -520,6 +520,14 @@ class SSA:
             if r['usage'] == 'del':
                 del_set.append(r['name'])
         return stored_idents, loaded_idents, []
+
+    def get_global_unique_name(self, var_name, used_var_names):
+        idx = 2
+        appendix = ""
+        while (var_name + appendix) in used_var_names:
+            appendix = "_" + idx
+            idx += 1
+        return var_name + appendix
 
     def to_json(self):
         pass

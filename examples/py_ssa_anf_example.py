@@ -67,16 +67,12 @@ print(a)
 print(a)
 """
 cc = """
-def fib():
-    a = 0
-    b = 1
-    while True:
-        yield a
-        a, b = b, a + b
-fib()
+t = "asd"
+if (not a) != "live.com" and t != "google.com":
+    pass
 """
 
-"""
+xy="""
 List comprehension
 
 s = [x for x in range(1, 5) if True == True]
