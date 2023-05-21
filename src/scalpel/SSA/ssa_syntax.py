@@ -183,14 +183,15 @@ class SSA_B(SSANode):
 
 
 class SSA_P(SSANode):
-    def __init__(self, name: SSA_V_VAR, blocks: [SSA_B]):
+    def __init__(self, name: SSA_V_VAR, args: [SSA_V], blocks: [SSA_B]):
         self.name: SSA_V_VAR = name
+        self.args: [SSA_V] = args
         self.blocks: [SSA_B] = blocks
         self.blocks.sort(key=lambda x: x.label.label)
 
     def print(self):
         # return '\n\n'.join([b.print(0) for b in self.blocks])
-        return 'proc ' + self.name.print(0) + '()\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}\n'
+        return 'proc ' + self.name.print(0) + print_args(self.args, 0) + '\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}\n'
 
 
 class SSA_AST(SSANode):
@@ -259,10 +260,19 @@ ssa_results_loads = {}
 ssa_results_phi_stored = {}
 ssa_results_phi_loads = {}
 const_dict = {}
+used_var_names = []
 
-# TODO include functions - ssa only uses all under entry block
+
+def update_used_vars():
+    global used_var_names
+    for block_vars in ssa_results_stored.values():
+        for term_vars in block_vars:
+            for var in term_vars:
+                used_var_names.append(var)
+
+
 def PY_to_SSA_AST(code_str: str):
-    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
+    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names
 
     mnode = MNode("local")
     mnode.source = code_str
@@ -270,8 +280,8 @@ def PY_to_SSA_AST(code_str: str):
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-    procs = PS_FS(None, cfg.functioncfgs, m_ssa)
-    ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg)
+    procs = PS_FS(None, cfg.functioncfgs, cfg.function_args, m_ssa)
+    ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names)
     print('ssa_results_stored',ssa_results_stored)
     print('ssa_results_loads',ssa_results_loads)
     print('ssa_results_phi_stored',ssa_results_phi_stored)
@@ -281,6 +291,7 @@ def PY_to_SSA_AST(code_str: str):
     base_proc_name = "SSA_START_PROC"
     # proc = SSA_P(SSA_V_VAR(base_proc_name), ) #+ PS_FS(cfg.functioncfgs))
     ssa_ast = SSA_AST(procs, PS_BS(None, cfg.get_all_blocks()))
+    update_used_vars()
     return ssa_ast
 
 
@@ -296,14 +307,16 @@ def PS_PHI(curr_block):
     return assignments
 
 
-def PS_FS(prov_info, function_cfgs, m_ssa):
+def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
     procs = []
     for key in function_cfgs:
         cfg = function_cfgs[key]
+        args = function_args[key]
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(
             cfg)
-        procs.append(SSA_P(SSA_V_VAR(cfg.name), PS_BS(prov_info, cfg.get_all_blocks())))
+        procs.append(SSA_P(SSA_V_VAR(cfg.name), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, cfg.get_all_blocks())))
+        update_used_vars()
     return procs
 
 
@@ -409,15 +422,26 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     elif isinstance(stmt, ast.Attribute):
         return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.attr), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)])
     elif isinstance(stmt, ast.Name):
+        name = get_global_unique_name(stmt.id)
         if is_load:
-            if stmt.id in ssa_results_loads[curr_block.id][st_nr]:
-                var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][stmt.id])]
+            if name in ssa_results_loads[curr_block.id][st_nr]:
+                var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][name])]
                 var_list_join = str('_'.join(var_list))
-                return SSA_V_VAR(stmt.id + '_' + str(var_list_join))
-            return SSA_V_VAR(stmt.id)
-        return SSA_V_VAR(stmt.id + '_' + str(ssa_results_stored[curr_block.id][st_nr][stmt.id]))
+                return SSA_V_VAR(name + '_' + str(var_list_join))
+            return SSA_V_VAR(name)
+        return SSA_V_VAR(name + '_' + str(ssa_results_stored[curr_block.id][st_nr][name]))
     return stmt
 
+
+def get_global_unique_name(var_name):
+    idx = 2
+    appendix = ""
+    if var_name not in used_var_names:
+        return var_name
+    while (var_name + appendix) in used_var_names:
+        appendix = "_" + str(idx)
+        idx += 1
+    return var_name + appendix
 
 def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
     if len(ops) == 1:

@@ -61,9 +61,9 @@ def IsEasyChairQuery(input: str) -> bool:
     # s survived all checks
     return True
 IsEasyChairQuery('test')
-
+    
+lastSlash = 1
 a = 1
-print(a)
 print(a)
 """
 cc = """

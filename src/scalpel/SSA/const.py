@@ -172,7 +172,7 @@ class SSA:
 
         return block_renamed_loaded, ident_const_dict
 
-    def compute_SSA2(self, cfg, used_variable_names = []):
+    def compute_SSA2(self, cfg, used_var_names = []):
         """
         Compute single static assignment form representations for a given CFG.
         During the computing, constant value and alias pairs are generated. The following steps are used to compute SSA representations:
@@ -218,7 +218,7 @@ class SSA:
             for idx, stmt in enumerate(block.statements):
                 stmt_const_dict = {}
                 stored_idents, loaded_idents, func_names = self.get_stmt_idents_ctx(stmt,
-                                                                                    const_dict=stmt_const_dict)
+                                                 [], stmt_const_dict, used_var_names)
                 tmp_const_dict[idx] = stmt_const_dict
                 block_loaded_idents[block.id] += [loaded_idents]
                 block_stored_idents[block.id] += [stored_idents]
@@ -334,7 +334,7 @@ class SSA:
         return nrs
 
 
-    def get_stmt_idents_ctx(self, stmt, del_set=[], const_dict = {}, used_var_names = {}):
+    def get_stmt_idents_ctx(self, stmt, del_set=[], const_dict = {}, used_var_names = []):
         """
         Extract the contextual information of each of identifiers.
         For assignment statements, the assigned values for each of variables will be stored.
@@ -356,9 +356,11 @@ class SSA:
             if len(targets) == 1:
                 if hasattr(targets[0], "id"):
                     left_name = stmt.targets[0].id
+                    left_name = self.get_global_unique_name(left_name, used_var_names)
                     const_dict[left_name] = stmt.value
                 elif isinstance(targets[0], ast.Attribute):
                     left_name = astor.to_source(stmt.targets[0]).strip()
+                    left_name = self.get_global_unique_name(left_name, used_var_names)
                     const_dict[left_name] = value
                 # multiple targets are represented as tuple
                 elif isinstance(targets[0], ast.Tuple):
@@ -367,6 +369,7 @@ class SSA:
                         for elt, val in zip(targets[0].elts, value.elts):
                             if hasattr(elt, "id"):
                                 left_name = elt.id
+                                left_name = self.get_global_unique_name(left_name, used_var_names)
                                 const_dict[left_name] = val
                             elif isinstance(targets[0], ast.Attribute):
                                 #TODO: resolve attributes
@@ -376,6 +379,7 @@ class SSA:
                         for elt in targets[0].elts:
                             if hasattr(elt, "id"):
                                 left_name = elt.id
+                                left_name = self.get_global_unique_name(left_name, used_var_names)
                                 const_dict[left_name] = value
                             elif isinstance(targets[0], ast.Attribute):
                                 #TODO: resolve attributes
@@ -388,6 +392,7 @@ class SSA:
                     # then no valid constant value can be recorded for this statement
                     if hasattr(target, "id"):
                         left_name = target.id
+                        left_name = self.get_global_unique_name(left_name, used_var_names)
                         const_dict[left_name] = None  # TODO: design a type for these kind of values
                     elif isinstance(stmt.targets[0], ast.Attribute):
                         #TODO: resolve attributes
@@ -399,6 +404,7 @@ class SSA:
         if isinstance(stmt, ast.AnnAssign):
             if hasattr(stmt.target, "id"):
                 left_name = stmt.target.id
+                left_name = self.get_global_unique_name(left_name, used_var_names)
                 const_dict[left_name] = stmt.value
             elif isinstance(stmt.target, ast.Attribute):
                 #TODO: resolve attributes
@@ -408,6 +414,7 @@ class SSA:
             # if the statement is "a += 1", then the assigned value should be a+1
             if hasattr(stmt.target, "id"):
                 left_name = stmt.target.id
+                left_name = self.get_global_unique_name(left_name, used_var_names)
                 extended_right = ast.BinOp(ast.Name(left_name, ast.Load()), stmt.op, stmt.value)
                 const_dict[left_name] = extended_right
             elif isinstance(stmt.target, ast.Attribute):
@@ -419,6 +426,7 @@ class SSA:
             # the element of stmt.iter is the value of this assignment
             if hasattr(stmt.target, "id"):
                 left_name = stmt.target.id
+                left_name = self.get_global_unique_name(left_name, used_var_names)
                 iter_value = stmt.iter
                 # make a iter call
                 #iter_node = ast.Call(ast.Name("iter", ast.Load()), [stmt.iter], [])
@@ -431,7 +439,9 @@ class SSA:
                 # for x, y in fun():
                 for elt in stmt.target.elts:
                     if hasattr(elt, "id"):
-                        const_dict[elt.id] = stmt.iter
+                        left_name = elt.id
+                        left_name = self.get_global_unique_name(left_name, used_var_names)
+                        const_dict[left_name] = stmt.iter
             elif isinstance(stmt.target, ast.Attribute):
                 #TODO: resolve attributes
                 pass
@@ -439,9 +449,11 @@ class SSA:
 
 
         if isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            stored_idents.append(stmt.name)
-            const_dict[stmt.name] = stmt
-            func_names.append(stmt.name)
+            left_name = stmt.name
+            left_name = self.get_global_unique_name(left_name, used_var_names)
+            stored_idents.append(left_name)
+            const_dict[left_name] = stmt
+            func_names.append(left_name)
             new_stmt = stmt
             new_stmt.body = []
             ident_info = get_vars(new_stmt)
@@ -453,9 +465,11 @@ class SSA:
             return stored_idents, loaded_idents, func_names
 
         if isinstance(stmt, ast.ClassDef):
-            stored_idents.append(stmt.name)
-            const_dict[stmt.name] = None
-            func_names.append(stmt.name)
+            left_name = stmt.name
+            left_name = self.get_global_unique_name(left_name, used_var_names)
+            stored_idents.append(left_name)
+            const_dict[left_name] = None
+            func_names.append(left_name)
             return stored_idents, loaded_idents, func_names
 
         # if this is control flow statements, we should not visit its body to avoid duplicates
@@ -471,16 +485,16 @@ class SSA:
         if isinstance(stmt, (ast.Try)):
             for handler in stmt.handlers:
                 if handler.name is not None:
-                    stored_idents.append(handler.name)
+                    stored_idents.append(self.get_global_unique_name(handler.name, used_var_names))
 
                 if isinstance(handler.type, ast.Name):
-                    loaded_idents.append(handler.type.id)
+                    loaded_idents.append(self.get_global_unique_name(handler.type.id, used_var_names))
                 elif isinstance(handler.type, ast.Attribute) and isinstance(handler.type.value, ast.Name):
-                    loaded_idents.append(handler.type.value.id)
+                    loaded_idents.append(self.get_global_unique_name(handler.type.value.id, used_var_names))
             return stored_idents, loaded_idents, []
         if isinstance(stmt, ast.Global):
             for name in stmt.names:
-                self.global_names.append(name)
+                self.global_names.append(self.get_global_unique_name(name, used_var_names))
             return stored_idents, loaded_idents, []
 
         visit_node = stmt
@@ -514,18 +528,18 @@ class SSA:
             if r['name'] is None or "_hidden_" in r['name']:
                 continue
             if r['usage'] == 'store':
-                stored_idents.append(r['name'])
+                stored_idents.append(self.get_global_unique_name(r['name'], used_var_names))
             else:
-                loaded_idents.append(r['name'])
+                loaded_idents.append(self.get_global_unique_name(r['name'], used_var_names))
             if r['usage'] == 'del':
-                del_set.append(r['name'])
+                del_set.append(self.get_global_unique_name(r['name'], used_var_names))
         return stored_idents, loaded_idents, []
 
     def get_global_unique_name(self, var_name, used_var_names):
         idx = 2
         appendix = ""
         while (var_name + appendix) in used_var_names:
-            appendix = "_" + idx
+            appendix = "_" + str(idx)
             idx += 1
         return var_name + appendix
 
