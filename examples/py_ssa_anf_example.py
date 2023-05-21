@@ -62,14 +62,20 @@ def IsEasyChairQuery(input: str) -> bool:
     return True
 IsEasyChairQuery('test')
     
-lastSlash = 1
-a = 1
-print(a)
 """
 cc = """
 t = "asd"
 if (not a) != "live.com" and t != "google.com":
     pass
+"""
+c3 = """
+print("asdf")
+for i in a:
+    print(1)
+for i in [0, 1, 2]:
+    print(1)
+for i in [0, 1, 2]:
+    print(1)
 """
 
 xy="""
@@ -101,7 +107,8 @@ def toSSA_and_print():
     m_ssa = SSA()
 
 
-    # TODO: SSA should only have distinct variables globally, therefore change variable names
+    # TODO: Global renaming not working for function names
+    # TODO: For loops
 
     ssa_ast = PY_to_SSA_AST(ccc)
     print()
@@ -150,4 +157,6 @@ if __name__ == '__main__':
     #print(IsEasyChairQuery("http://www.live.com/sedrgerg/sdfsefes/EasyChair"))
     #print(IsEasyChairQuery("https://www.live.com/sedrgerg/sdfsefes/EasyChair"))
     #print(IsEasyChairQuery("http://www.livecom/sedrgerg/sdfsefes/EasyChair"))
+
+
 

@@ -122,7 +122,7 @@ buffer_variable_counter = 0
 def SA(ssa_ast: SSA_AST):
     global ssa_ast_global
     ssa_ast_global = ssa_ast
-    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_VAR(ssa_ast.blocks[0].label.label))))
+    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_VAR(get_first_block_in_proc(ssa_ast.blocks).label.label))))
 
 
 def SA_PS(ps: [SSA_P], inner_term):
@@ -131,9 +131,9 @@ def SA_PS(ps: [SSA_P], inner_term):
 
     p: SSA_P = ps[0]
     if len(ps) == 1:
-        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(p.blocks[0].label.label))), inner_term)
+        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(get_first_block_in_proc(p.blocks).label.label))), inner_term)
     else:
-        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(p.blocks[0].label.label))), SA_PS[1:])
+        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(get_first_block_in_proc(p.blocks).label.label))), SA_PS[1:])
 
     return let_rec
 
@@ -233,3 +233,5 @@ def get_buffer_variable():
 
 
 buffer_assignments = {}
+
+

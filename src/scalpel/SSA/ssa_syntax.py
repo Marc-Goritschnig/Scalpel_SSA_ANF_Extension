@@ -177,8 +177,8 @@ class SSA_B(SSANode):
     def print(self, lvl):
         new_line = '\n'
 
-        if self.first_in_proc:
-            return print_terms(self.terms, lvl)
+        #if self.first_in_proc:
+        #    return print_terms(self.terms, lvl)
         return get_indentation(lvl) + f"{'L' + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
 
 
@@ -251,6 +251,10 @@ def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B) -> [str]:
     return vars_for_jump
 
 
+def get_first_block_in_proc(blocks: [SSA_B]):
+    for b in blocks:
+        if b.first_in_proc:
+            return b
 
 
 block_counter = 1
@@ -269,6 +273,8 @@ def update_used_vars():
         for term_vars in block_vars:
             for var in term_vars:
                 used_var_names.append(var)
+    for tup in const_dict.keys():
+        used_var_names.append(tup[1])
 
 
 def PY_to_SSA_AST(code_str: str):
@@ -315,7 +321,7 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
         args = function_args[key]
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(
             cfg)
-        procs.append(SSA_P(SSA_V_VAR(cfg.name), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, cfg.get_all_blocks())))
+        procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, cfg.get_all_blocks())))
         update_used_vars()
     return procs
 
@@ -376,6 +382,8 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         return PS_E(prov_info, curr_block, stmt.value, st_nr, True)
     elif isinstance(stmt, ast.Return):
         return SSA_E_RET(PS_E(prov_info, curr_block, stmt.value, st_nr, True))
+    elif isinstance(stmt, ast.For):
+        return
 
 
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
@@ -459,3 +467,4 @@ def PS_B_REF(prov_info, curr_block):
     block_refs[curr_block] = SSA_L(str(curr_block.id))
     block_counter += 1
     return block_refs[curr_block]
+
