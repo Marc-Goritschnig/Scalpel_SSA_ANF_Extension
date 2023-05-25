@@ -99,6 +99,10 @@ x = a[1]
 x = b[:2]
 x = c['A']
 """
+
+tuple_test = """
+a, b = 1, 2
+"""
 def toSSA_and_print():
     mnode = MNode("local")
     mnode.source = code_str
@@ -106,11 +110,10 @@ def toSSA_and_print():
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-
-    # TODO: Global renaming not working for function names
     # TODO: For loops
+    # TODO: Tuple transformation
 
-    ssa_ast = PY_to_SSA_AST(ccc)
+    ssa_ast = PY_to_SSA_AST(tuple_test)
     print()
     print(ssa_ast.print())
 

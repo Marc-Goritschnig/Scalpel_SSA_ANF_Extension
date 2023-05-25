@@ -187,7 +187,6 @@ class SSA_P(SSANode):
         self.name: SSA_V_VAR = name
         self.args: [SSA_V] = args
         self.blocks: [SSA_B] = blocks
-        self.blocks.sort(key=lambda x: x.label.label)
 
     def print(self):
         # return '\n\n'.join([b.print(0) for b in self.blocks])
@@ -296,10 +295,15 @@ def PY_to_SSA_AST(code_str: str):
 
     base_proc_name = "SSA_START_PROC"
     # proc = SSA_P(SSA_V_VAR(base_proc_name), ) #+ PS_FS(cfg.functioncfgs))
-    ssa_ast = SSA_AST(procs, PS_BS(None, cfg.get_all_blocks()))
+    ssa_ast = SSA_AST(procs, PS_BS(None, sort_blocks(cfg.get_all_blocks())))
     update_used_vars()
     return ssa_ast
 
+
+def sort_blocks(blocks):
+    #blocks.sort(key=lambda x: x.id)
+    #print([b.id for b in blocks])
+    return blocks
 
 def PS_PHI(curr_block):
 
@@ -321,7 +325,7 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
         args = function_args[key]
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(
             cfg)
-        procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, cfg.get_all_blocks())))
+        procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))))
         update_used_vars()
     return procs
 
@@ -338,6 +342,7 @@ def PS_BS(prov_info, blocks):
     for b in blocks:
         blocks_parsed += PS_B(None, b, i == 0)
         i += 1
+
     return blocks_parsed
 
 
@@ -350,7 +355,9 @@ def PS_B(prov_info, block, first_in_proc):
     block_ref = PS_B_REF(prov_info, block)
 
     stmts = PS_PHI(block)
-    stmts += [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements) if not isinstance(stmt, ast.FunctionDef)]
+    stmt_lists = [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements) if not isinstance(stmt, ast.FunctionDef)]
+    stmts += [st for l in stmt_lists for st in l]
+
     if len(block.exits) == 1:
         stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
     b = SSA_B(block_ref, stmts, first_in_proc)
@@ -361,29 +368,43 @@ def PS_B(prov_info, block, first_in_proc):
     return [b]# + exits
 
 
+buffer_var_name = "_ssa_buffer_"
+buffer_counter = 0
+
+
+def get_buffer_var():
+    global buffer_counter
+    buffer_counter = buffer_counter + 1
+    return buffer_var_name + str(buffer_counter - 1)
+
+
 def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
-        return SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True))
+        if isinstance(stmt.targets[0], ast.Tuple):
+            tuple_name = get_buffer_var()
+            post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_V_FUNC_CALL(SSA_V_VAR('tuple_get'), [SSA_V_VAR(tuple_name), SSA_V_CONST(str(idx))])) for idx, var in enumerate(stmt.targets[0].elts)]
+            return [SSA_E_ASS(SSA_V_VAR(tuple_name), PS_E(prov_info, curr_block, stmt.value, st_nr, True))] + post_stmts
+        return [SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
     elif isinstance(stmt, ast.If):
         if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
         if len(curr_block.exits) == 1:
             else_ref = SSA_E_RET(None)
         else:
             else_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[1].target))
-        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), if_ref, else_ref)
+        return [SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), if_ref, else_ref)]
     elif isinstance(stmt, ast.While):
         if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
         if len(curr_block.exits) == 1:
             else_ref = SSA_E_RET(None)
         else:
             else_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[1].target))
-        return SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), if_ref, else_ref)
+        return [SSA_E_IF_ELSE(PS_E(prov_info, curr_block, stmt.test, st_nr, True), if_ref, else_ref)]
     elif isinstance(stmt, ast.Expr):
-        return PS_E(prov_info, curr_block, stmt.value, st_nr, True)
+        return [PS_E(prov_info, curr_block, stmt.value, st_nr, True)]
     elif isinstance(stmt, ast.Return):
-        return SSA_E_RET(PS_E(prov_info, curr_block, stmt.value, st_nr, True))
+        return [SSA_E_RET(PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
     elif isinstance(stmt, ast.For):
-        return
+        return []
 
 
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
@@ -407,6 +428,8 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             return SSA_V_CONST(stmt.value)
     elif isinstance(stmt, ast.Slice):
         return SSA_V_CONST(stmt.value)
+    elif isinstance(stmt, ast.Tuple):
+        return SSA_V_FUNC_CALL(SSA_V_VAR('new_tuple_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
     elif isinstance(stmt, ast.Dict):
         return SSA_V_FUNC_CALL(SSA_V_VAR('new_dict_' + str(len(stmt.keys))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for args in zip(stmt.keys, stmt.values) for arg in args])
     elif isinstance(stmt, ast.Set):

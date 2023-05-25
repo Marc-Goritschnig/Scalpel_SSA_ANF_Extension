@@ -72,7 +72,7 @@ class ANF_E_APP(ANF_E):
         self.name: ANF_V_VAR = name
 
     def print(self, lvl):
-        return get_indentation(lvl) + f"{self.name.print(lvl)}({', '.join([var.print(lvl) for var in self.params])})"
+        return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
 
 class ANF_E_LET(ANF_E):
@@ -118,6 +118,7 @@ def parse_ssa_to_anf(ssa: SSA_AST):
 
 ssa_ast_global = None
 buffer_variable_counter = 0
+block_identifier = 'L'
 
 def SA(ssa_ast: SSA_AST):
     global ssa_ast_global
@@ -131,9 +132,9 @@ def SA_PS(ps: [SSA_P], inner_term):
 
     p: SSA_P = ps[0]
     if len(ps) == 1:
-        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(get_first_block_in_proc(p.blocks).label.label))), inner_term)
+        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label))), inner_term)
     else:
-        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(get_first_block_in_proc(p.blocks).label.label))), SA_PS[1:])
+        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label))), SA_PS[1:])
 
     return let_rec
 
@@ -155,10 +156,10 @@ def SA_BS(bs: [SSA_B], inner_call):
         func = ANF_V_FUNC(None, SA_ES(b, b.terms))
 
     if len(bs) == 1:
-        let_rec = ANF_E_LETREC(SA_V(b.label), func,
+        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func,
                                inner_call)
     else:
-        let_rec = ANF_E_LETREC(SA_V(b.label), func,
+        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func,
                            SA_BS(bs[1:], inner_call))
 
     #for b in bs[1:]:
@@ -177,15 +178,15 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         unwrap_inner_applications_naming(term.value)
         return unwrap_inner_applications_let_structure(term.value, ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:])))
     if isinstance(term, SSA_E_GOTO):
-        return ANF_E_APP(get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label)), SA_V(term.label))
+        return ANF_E_APP(get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label)), ANF_V_CONST(block_identifier + term.label.label))
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
     if isinstance(term, SSA_E_RET):
         unwrap_inner_applications_naming(term.value)
         return unwrap_inner_applications_let_structure(term.value, SA_V(term.value))
     if isinstance(term, SSA_E_IF_ELSE):
-        unwrap_inner_applications_naming(term.test)
-        return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else])))
+        unwrap_inner_applications_naming(term.test, True)
+        return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else])), True)
     #if isinstance(term, SSA_V_FUNC_CALL):
     #    unwrap_inner_applications_naming(term.test)
     #    return unwrap_inner_applications_let_structure(ANF_E_LET(ANF_V_VAR('_'), SA_V(term), SA_ES(b, terms[1:])))
@@ -195,8 +196,11 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
     return ANF_E_APP([], SA_V('terms'))
 
 
-def unwrap_inner_applications_let_structure(var: SSA_V, inner):
+def unwrap_inner_applications_let_structure(var: SSA_V, inner, unwrap_var: bool = False):
     if isinstance(var, SSA_V_FUNC_CALL):
+        if unwrap_var:
+            name = buffer_assignments[var]
+            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name), SA_V(var), inner))
         for arg in var.args:
             if isinstance(arg, SSA_V_FUNC_CALL):
                 name = buffer_assignments[arg]
@@ -204,8 +208,11 @@ def unwrap_inner_applications_let_structure(var: SSA_V, inner):
     return inner
 
 
-def unwrap_inner_applications_naming(var: SSA_V):
+def unwrap_inner_applications_naming(var: SSA_V, unwrap_var: bool = False):
     if isinstance(var, SSA_V_FUNC_CALL):
+        if unwrap_var:
+            name = get_buffer_variable()
+            buffer_assignments[var] = name
         for arg in var.args:
             if isinstance(arg, SSA_V_FUNC_CALL):
                 name = get_buffer_variable()
@@ -213,7 +220,7 @@ def unwrap_inner_applications_naming(var: SSA_V):
                 unwrap_inner_applications_naming(arg)
 
 
-def SA_V(var: SSA_V):
+def SA_V(var: SSA_V, can_be_buffered: bool = False):
     if isinstance(var, SSA_V_VAR):
         return ANF_V_VAR(var.name)
     if isinstance(var, SSA_V_CONST):
@@ -221,7 +228,10 @@ def SA_V(var: SSA_V):
     if isinstance(var, SSA_L):
         return ANF_V_CONST(var.label)
     if isinstance(var, SSA_V_FUNC_CALL):
-        return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par]) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name))
+        if can_be_buffered and var in buffer_assignments:
+            return ANF_V_VAR(buffer_assignments[var])
+        else:
+            return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par]) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name))
 
     return ANF_V_CONST('Not impl')
 
