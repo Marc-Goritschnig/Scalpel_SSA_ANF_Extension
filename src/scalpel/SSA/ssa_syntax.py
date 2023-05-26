@@ -408,7 +408,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     var_name, idx = old_iter_var.name.rsplit('_')
     old_iter_var.name = var_name + '_' + str(int(idx) - 1)
     old_iter_var2 = PS_E(prov_info, block, stmt.target, 0, False)
-    old_iter_var2.name = old_iter_var2.name + '.2'
+    old_iter_var2.name = old_iter_var2.name + '_2'
     stmts.append(SSA_E_ASS(old_iter_var, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)])))
     stmts.append(SSA_E_GOTO(SSA_L(new_block_name)))
 
