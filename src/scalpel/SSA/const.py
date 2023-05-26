@@ -585,7 +585,11 @@ class SSA:
             preds = block.predecessors
             for link in preds+exits:
                 G.add_edge(link.source.id, link.target.id)
-        DF = nx.dominance_frontiers(G, entry_block.id)
-        #idom = nx.immediate_dominators(G, entry_block.id)
+
+        # Add entry edge 0-1 and set starting node to 0
+        # -> so that the entry node is not in its own immediate dominator set
+        # This is due to a wrong behaviour of the nx library
+        G.add_edge(0, entry_block.id)
+        DF = nx.dominance_frontiers(G, 0)
         return DF
 

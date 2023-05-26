@@ -123,7 +123,7 @@ block_identifier = 'L'
 def SA(ssa_ast: SSA_AST):
     global ssa_ast_global
     ssa_ast_global = ssa_ast
-    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_VAR(get_first_block_in_proc(ssa_ast.blocks).label.label))))
+    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + str(get_first_block_in_proc(ssa_ast.blocks).label.label)))))
 
 
 def SA_PS(ps: [SSA_P], inner_term):
@@ -182,6 +182,8 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
     if isinstance(term, SSA_E_RET):
+        if term.value is None:
+            return ANF_V_UNIT()
         unwrap_inner_applications_naming(term.value)
         return unwrap_inner_applications_let_structure(term.value, SA_V(term.value))
     if isinstance(term, SSA_E_IF_ELSE):
@@ -191,7 +193,8 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
     #    unwrap_inner_applications_naming(term.test)
     #    return unwrap_inner_applications_let_structure(ANF_E_LET(ANF_V_VAR('_'), SA_V(term), SA_ES(b, terms[1:])))
     if issubclass(type(term), SSA_V):
-        return SA_V(term)
+        unwrap_inner_applications_naming(term)
+        return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:])))
     print("not impl", term)
     return ANF_E_APP([], SA_V('terms'))
 

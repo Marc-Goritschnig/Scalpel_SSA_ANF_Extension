@@ -101,7 +101,29 @@ x = c['A']
 """
 
 tuple_test = """
-a, b = 1, 2
+a = 1
+b = 2
+a, b = b, a
+"""
+for_test = """
+for i in range(5):
+    print(i)
+"""
+if_test = """
+a = 1
+if a == 1:
+    a = 2
+else:
+    a = 3
+print(a)
+"""
+
+global_renaming_test = """
+def aaa():
+    a = 1
+    print(a)
+a = 2
+aaa()
 """
 def toSSA_and_print():
     mnode = MNode("local")
@@ -110,10 +132,7 @@ def toSSA_and_print():
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-    # TODO: For loops
-    # TODO: Tuple transformation
-
-    ssa_ast = PY_to_SSA_AST(tuple_test)
+    ssa_ast = PY_to_SSA_AST(for_test)
     print()
     print(ssa_ast.print())
 

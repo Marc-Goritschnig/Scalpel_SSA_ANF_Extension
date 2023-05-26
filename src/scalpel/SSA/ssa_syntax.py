@@ -354,18 +354,23 @@ def PS_B(prov_info, block, first_in_proc):
     # blocks_checked.append(block)
     block_ref = PS_B_REF(prov_info, block)
 
-    stmts = PS_PHI(block)
-    stmt_lists = [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements) if not isinstance(stmt, ast.FunctionDef)]
-    stmts += [st for l in stmt_lists for st in l]
+    if isinstance(block.statements[0], ast.For):
+        return PS_FOR(prov_info, block_ref, block, block.statements[0], first_in_proc)
+    else:
+        stmts = PS_PHI(block)
+        stmt_lists = [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements) if not isinstance(stmt, ast.FunctionDef)]
+        stmts += [st for l in stmt_lists for st in l]
 
-    if len(block.exits) == 1:
-        stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
-    b = SSA_B(block_ref, stmts, first_in_proc)
+        if block in addon_statements_per_block:
+            stmts += addon_statements_per_block[block]
+        if len(block.exits) == 1:
+            stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
+        b = SSA_B(block_ref, stmts, first_in_proc)
 
-    if len(block.exits) == 0:
-        return [b]
-    #exits = reduce(lambda a, b: a+b, [PS_B(prov_info, exit_b.target) for exit_b in block.exits])
-    return [b]# + exits
+        if len(block.exits) == 0:
+            return [b]
+        #exits = reduce(lambda a, b: a+b, [PS_B(prov_info, exit_b.target) for exit_b in block.exits])
+        return [b]# + exits
 
 
 buffer_var_name = "_ssa_buffer_"
@@ -377,6 +382,61 @@ def get_buffer_var():
     buffer_counter = buffer_counter + 1
     return buffer_var_name + str(buffer_counter - 1)
 
+
+def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
+    # LX
+    # l = list
+    # i = next(l)
+    # LX_2:
+    # i_1 <- PHI(i_0, i_1)
+    # buf <- i is None
+    # if buf:
+    #   goto LX+2
+    # else:
+    #   goto LX+1
+    # LX+1
+    # Body of loop
+    # i_1 = next(l)
+    global addon_statements_per_block
+    new_block_name = block_ref.label + '_2'
+
+    stmts = []
+    iter_var = get_buffer_var()
+    stmts.append(SSA_E_ASS(SSA_V_VAR(iter_var), PS_E(prov_info, block, stmt.iter, 0, False)))
+
+    old_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
+    var_name, idx = old_iter_var.name.rsplit('_')
+    old_iter_var.name = var_name + '_' + str(int(idx) - 1)
+    old_iter_var2 = PS_E(prov_info, block, stmt.target, 0, False)
+    old_iter_var2.name = old_iter_var2.name + '.2'
+    stmts.append(SSA_E_ASS(old_iter_var, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)])))
+    stmts.append(SSA_E_GOTO(SSA_L(new_block_name)))
+
+    b = SSA_B(block_ref, stmts, first_in_proc)
+
+    stmts2 = []
+    next_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
+    stmts2.append(SSA_E_ASS_PHI(next_iter_var, [old_iter_var, old_iter_var2]))
+    buffer = get_buffer_var()
+    stmts2.append(SSA_E_ASS(SSA_V_VAR(buffer), SSA_V_FUNC_CALL(SSA_V_VAR(ast.Is.__name__), [next_iter_var, SSA_V_VAR("None")])))
+    if len(block.exits) == 1:
+        else_ref = SSA_E_RET(None)
+    else:
+        else_ref = SSA_E_GOTO(PS_B_REF(prov_info, block.exits[1].target))
+
+    stmts2.append(SSA_E_IF_ELSE(SSA_V_VAR(buffer), SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target)), else_ref))
+
+    block.exits[0].target.exits[0].target = CFGBlockMock(new_block_name)
+    addon_statements_per_block[block.exits[0].target] = [SSA_E_ASS(old_iter_var2, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)]))]
+    b2 = SSA_B(SSA_L(new_block_name), stmts2, first_in_proc)
+
+    return [b, b2]
+
+addon_statements_per_block = {}
+
+class CFGBlockMock:
+  def __init__(self, id):
+    self.id = id
 
 def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
@@ -404,6 +464,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
     elif isinstance(stmt, ast.Return):
         return [SSA_E_RET(PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
     elif isinstance(stmt, ast.For):
+        # Handled separately
         return []
 
 
@@ -458,9 +519,14 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             if name in ssa_results_loads[curr_block.id][st_nr]:
                 var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][name])]
                 var_list_join = str('_'.join(var_list))
-                return SSA_V_VAR(name + '_' + str(var_list_join))
+                if len(var_list) > 0:
+                    return SSA_V_VAR(name + '_' + str(var_list_join))
+                else:
+                    return SSA_V_VAR(name)
             return SSA_V_VAR(name)
-        return SSA_V_VAR(name + '_' + str(ssa_results_stored[curr_block.id][st_nr][name]))
+        if name in ssa_results_stored[curr_block.id][st_nr]:
+            return SSA_V_VAR(name + '_' + str(ssa_results_stored[curr_block.id][st_nr][name]))
+        return SSA_V_VAR(name)
     return stmt
 
 
