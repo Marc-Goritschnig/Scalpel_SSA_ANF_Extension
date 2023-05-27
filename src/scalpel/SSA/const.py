@@ -589,6 +589,17 @@ class SSA:
         # Add entry edge 0-1 and set starting node to 0
         # -> so that the entry node is not in its own immediate dominator set
         # This is due to a wrong behaviour of the nx library
+        #G.add_edge(0, entry_block.id)
+
+        # TODO: Check for networkx to implement fixes in idom calculation (idom = {start: None})
+        #       and in dominance frontiers to extend the if with (or u == start)
+        # DF = nx.dominance_frontiers(G, entry_block.id)
+
+        # Use this implementation if the library is not changed
+
+        # Add entry edge 0-1 and set starting node to 0
+        # -> so that the entry node is not in its own immediate dominator set
+        # This is due to a wrong behaviour of the nx library
         G.add_edge(0, entry_block.id)
         DF = nx.dominance_frontiers(G, 0)
         return DF

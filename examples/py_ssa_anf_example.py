@@ -108,6 +108,7 @@ a, b = b, a
 for_test = """
 for i in range(5):
     print(i)
+print("a")
 """
 if_test = """
 a = 1
