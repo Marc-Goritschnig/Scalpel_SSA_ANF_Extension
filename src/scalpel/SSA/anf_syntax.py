@@ -137,7 +137,7 @@ class ANF_E_LETREC(ANF_E):
 
     def get_prov_info(self, prov_info):
         if isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET):
-            return 'letrec;' + self.var.get_prov_info(None) + ';=;\n' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
+            return 'letrec;' + self.var.get_prov_info(None) + ';=\n' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
         else:
             return 'letrec;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
 

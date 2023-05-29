@@ -138,7 +138,7 @@ def toSSA_and_print():
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-    ssa_ast = PY_to_SSA_AST(bool_op_test)
+    ssa_ast = PY_to_SSA_AST(ccc)
     ssa_ast.enable_print_ascii()
     print()
     print(ssa_ast.print(0))
