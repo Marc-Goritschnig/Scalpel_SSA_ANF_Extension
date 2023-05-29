@@ -126,6 +126,11 @@ def aaa():
 a = 2
 aaa()
 """
+
+bool_op_test = """
+if (a or b) and d:
+    print("asdf")
+"""
 def toSSA_and_print():
     mnode = MNode("local")
     mnode.source = code_str
@@ -133,7 +138,7 @@ def toSSA_and_print():
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-    ssa_ast = PY_to_SSA_AST(for_test)
+    ssa_ast = PY_to_SSA_AST(bool_op_test)
     ssa_ast.enable_print_ascii()
     print()
     print(ssa_ast.print(0))

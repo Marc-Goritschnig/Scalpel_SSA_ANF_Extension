@@ -478,7 +478,7 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
     elif isinstance(stmt, ast.BoolOp): # TODO
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values])
-    elif isinstance(stmt, ast.UnaryOp):  # TODO
+    elif isinstance(stmt, ast.UnaryOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)])
     elif isinstance(stmt, ast.Call):
         if isinstance(stmt.func, ast.Attribute):

@@ -250,10 +250,11 @@ def unwrap_inner_applications_let_structure(var: SSA_V, inner, unwrap_var: bool 
         if unwrap_var:
             name = buffer_assignments[var]
             inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name), SA_V(var), inner))
-        for arg in var.args:
-            if isinstance(arg, SSA_V_FUNC_CALL):
-                name = buffer_assignments[arg]
-                inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name), SA_V(arg), inner))
+        else:
+            for arg in var.args:
+                if isinstance(arg, SSA_V_FUNC_CALL):
+                    name = buffer_assignments[arg]
+                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name), SA_V(arg), inner))
     return inner
 
 
