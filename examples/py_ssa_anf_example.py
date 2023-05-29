@@ -1,4 +1,4 @@
-from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text
+from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info
 from src.scalpel.SSA.ssa_syntax import PY_to_SSA_AST
 from src.scalpel.core.mnode import MNode
 from src.scalpel.SSA.const import SSA
@@ -141,16 +141,16 @@ def toSSA_and_print():
     anf_ast = parse_ssa_to_anf(ssa_ast)
     anf_ast.enable_print_ascii()
     print()
-    print(anf_ast.print(0))
+    print(print_anf_with_prov_info(anf_ast))
 
     with open('output/ssa_parsed.txt', 'w') as f:
         f.write(ssa_ast.print(0))
 
     with open('output/anf_parsed.txt', 'w') as f:
-        f.write(anf_ast.print(0))
+        f.write(print_anf_with_prov_info(anf_ast))
 
     # TODO: ASCII and LATEX format prints
-    parsed = parse_anf_from_text(anf_ast.print(0))
+    parsed = parse_anf_from_text(print_anf_with_prov_info(anf_ast))
     print('parsed:')
     print(parsed.print(0))
     #cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')

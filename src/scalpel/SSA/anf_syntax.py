@@ -22,6 +22,8 @@ class ANFNode:
         global font
         font = {'lambda_sign': 'λ'}
 
+    def get_prov_info(self, prov_info):
+        return ''
 
 
 class ANF_V(ANFNode):
@@ -31,6 +33,8 @@ class ANF_V(ANFNode):
     def print(self, lvl, prov_info: str = ''):
         return f"{self.value}"
 
+    def get_prov_info(self, prov_info):
+        return ''
 
 class ANF_V_CONST(ANF_V):
     def __init__(self, value: str):
@@ -39,6 +43,8 @@ class ANF_V_CONST(ANF_V):
     def print(self, lvl, prov_info: str = ''):
         return f"{self.value}"
 
+    def get_prov_info(self, prov_info):
+        return 'c'
 
 class ANF_V_VAR(ANF_V):
     def __init__(self, name: str):
@@ -47,6 +53,8 @@ class ANF_V_VAR(ANF_V):
     def print(self, lvl, prov_info: str = ''):
         return f"{self.name}"
 
+    def get_prov_info(self, prov_info):
+        return 'v'
 
 class ANF_V_UNIT(ANF_V):
     def __init__(self):
@@ -55,6 +63,8 @@ class ANF_V_UNIT(ANF_V):
     def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + "unit"
 
+    def get_prov_info(self, prov_info):
+        return 'u'
 
 class ANF_V_FUNC(ANF_V):
     def __init__(self, input_var: ANF_V, term: ANF_E):
@@ -70,6 +80,14 @@ class ANF_V_FUNC(ANF_V):
             return f"{font['lambda_sign']}{self.input_var.print(0)} . {self.term.print(lvl)}"
         return f"{font['lambda_sign']}{self.input_var.print(0)} . \n{self.term.print(lvl)}"
 
+    def get_prov_info(self, prov_info):
+        if self.input_var is None:
+            if issubclass(type(self.term), ANF_V):
+                return 'lambda;.;' + self.term.get_prov_info(None)
+            return 'lambda;.\n' + self.term.get_prov_info(None)
+        if issubclass(type(self.term), ANF_V):
+            return 'lambda;' + self.input_var.get_prov_info(None) + ';.;' + self.term.get_prov_info(None)
+        return 'lambda;' + self.input_var.get_prov_info(None) + ';.\n' + self.term.get_prov_info(None)
 
 class ANF_E(ANFNode):
     def __init__(self):
@@ -78,6 +96,8 @@ class ANF_E(ANFNode):
     def print(self, lvl):
         pass
 
+    def get_prov_info(self, prov_info):
+        return ''
 
 class ANF_E_APP(ANF_E):
     def __init__(self, params: [ANF_V_VAR], name: ANF_V_VAR):
@@ -87,6 +107,8 @@ class ANF_E_APP(ANF_E):
     def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
+    def get_prov_info(self, prov_info):
+        return 'f'+self.name.get_prov_info(None) + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
 
 class ANF_E_LET(ANF_E):
     def __init__(self, var: ANF_V_VAR, term1: ANF_E, term2: ANF_E):
@@ -97,6 +119,8 @@ class ANF_E_LET(ANF_E):
     def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
 
+    def get_prov_info(self, prov_info):
+        return 'let;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + ';in\n' + self.term2.get_prov_info(None)
 
 class ANF_E_LETREC(ANF_E):
     def __init__(self, var: ANF_V_FUNC, term1: ANF_E, term2: ANF_E):
@@ -107,9 +131,15 @@ class ANF_E_LETREC(ANF_E):
     def print(self, lvl=0, prov_info: str = ''):
         # assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
         if isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET):
-            return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + '\n' + self.term1.print(lvl + 1) + '\n' + get_indentation(lvl) + 'in \n' + self.term2.print(lvl + 1)
+            return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + '\n' + self.term1.print(lvl + 1) + '\n' + get_indentation(lvl) + 'in\n' + self.term2.print(lvl + 1)
         else:
-            return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + self.term1.print(lvl+1) + '\n' + get_indentation(lvl) + 'in \n' + self.term2.print(lvl + 1)
+            return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + self.term1.print(lvl+1) + '\n' + get_indentation(lvl) + 'in\n' + self.term2.print(lvl + 1)
+
+    def get_prov_info(self, prov_info):
+        if isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET):
+            return 'letrec;' + self.var.get_prov_info(None) + ';=;\n' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
+        else:
+            return 'letrec;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
 
 
 class ANF_E_IF(ANF_E):
@@ -120,6 +150,9 @@ class ANF_E_IF(ANF_E):
 
     def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
+
+    def get_prov_info(self, prov_info):
+        return 'if;' + self.test.get_prov_info(None) + ';then\n' + self.term_if.get_prov_info(None) + '\nelse\n' + self.term_else.get_prov_info(None)
 
 
 def get_indentation(nesting_lvl):
@@ -191,7 +224,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         unwrap_inner_applications_naming(term.value)
         return unwrap_inner_applications_let_structure(term.value, ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:])))
     if isinstance(term, SSA_E_GOTO):
-        return ANF_E_APP(get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label)), ANF_V_CONST(block_identifier + term.label.label))
+        return ANF_E_APP([SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label))], ANF_V_CONST(block_identifier + term.label.label))
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
     if isinstance(term, SSA_E_RET):
@@ -260,38 +293,47 @@ def get_buffer_variable():
 
 buffer_assignments = {}
 
+def print_anf_with_prov_info(anf_parent: ANFNode):
+    out = anf_parent.print()
+    prov = anf_parent.get_prov_info(None)
+    max_chars = max([len(line) for line in out.split('\n')]) + 6
+    return '\n'.join([line + (max_chars - len(line)) * ' ' + '#' + info for line, info in zip(out.split('\n'), prov.split('\n'))])
 
 def parse_anf_from_text(code: str):
     code = code.strip()
-    code = re.sub(' +', ' ', code)
-    return parse_anf_e_from_code([word for line in code.split('\n') for word in line.strip().split(' ')])
+    lines = code.split('\n')
+    code_lines, info_lines = zip(*[tuple(line.split('#')) for line in lines])
+    code_lines = [re.sub(' +', ' ', line) for line in code_lines]
+    return parse_anf_e_from_code([word for line in code_lines for word in line.strip().split(' ')], [info_word for line in info_lines for info_word in line.strip().split(';')])
 
 keywords = ['let', 'letrec', 'lambda', 'unit', 'if', 'then', 'else', 'in']
-def parse_anf_e_from_code(code_words):
+def parse_anf_e_from_code(code_words, info_words):
     next_word = code_words[0]
     if next_word == 'let':
         variable = ANF_V_VAR(code_words[1])
-        right = parse_anf_e_from_code(code_words[3:])
-        _in = get_other_section_part(code_words[1:], ['let', 'letrec'], ['in'])
+        right = parse_anf_e_from_code(code_words[3:], info_words[3:])
+        _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LET(variable, right, _in)
     if next_word == 'letrec':
         variable = ANF_V_VAR(code_words[1])
-        right = parse_anf_e_from_code(code_words[3:])
-        _in = get_other_section_part(code_words[1:], ['let', 'letrec'], ['in'])
+        right = parse_anf_e_from_code(code_words[3:], info_words[3:])
+        _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LETREC(variable, right, _in)
     if next_word == 'unit':
         return ANF_V_UNIT()
     if next_word == 'lambda':
         variable = ANF_V_VAR(code_words[1])
         rest = code_words[3:]
+        rest_info = info_words[3:]
         if code_words[1] == '.':
             variable = None
             rest = code_words[2:]
-        return ANF_V_FUNC(variable, parse_anf_e_from_code(rest))
+            rest_info = info_words[2:]
+        return ANF_V_FUNC(variable, parse_anf_e_from_code(rest, rest_info))
     if next_word == 'if':
-        then_part = get_other_section_part(code_words[1:], ['if'], ['then'])
-        else_part = get_other_section_part(code_words[1:], ['if'], ['else'])
-        return ANF_E_IF(parse_anf_e_from_code(code_words[1:]), then_part, else_part)
+        then_part = get_other_section_part(code_words[1:], info_words[1:], ['if'], ['then'])
+        else_part = get_other_section_part(code_words[1:], info_words[1:], ['if'], ['else'])
+        return ANF_E_IF(parse_anf_e_from_code(code_words[1:], info_words[1:]), then_part, else_part)
 
     count = 0
     while count + 1 < len(code_words) and next_word not in keywords:
@@ -299,16 +341,21 @@ def parse_anf_e_from_code(code_words):
         next_word = code_words[count]
 
     if count > 1:
-        return ANF_E_APP([parse_anf_v_from_code(code_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0]))
+        return ANF_E_APP([parse_anf_v_from_code(code_words[i], info_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0], info_words[0]))
     else:
-        return parse_anf_v_from_code(code_words[0])
+        return parse_anf_v_from_code(code_words[0], info_words[0])
 
 
-def parse_anf_v_from_code(code_word):
-    return ANF_V_VAR(code_word)
+def parse_anf_v_from_code(code_word: str, info_word: str):
+    if info_word == 'c':
+        return ANF_V_CONST(code_word)
+    if info_word == 'v':
+        return ANF_V_VAR(code_word)
+    if info_word.startswith('f'):
+        return ANF_E_APP([], parse_anf_v_from_code(code_word, info_word[1:]))
 
 
-def get_other_section_part(code_words: [str], open_keys: [str], close_keys: [str]):
+def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str], close_keys: [str]):
     indentation = 1
     idx = 0
     for i, w in enumerate(code_words):
@@ -319,6 +366,4 @@ def get_other_section_part(code_words: [str], open_keys: [str], close_keys: [str
         if indentation == 0:
             idx = i
             break
-    return parse_anf_e_from_code(code_words[idx+1:])
-# Anfe- App,          let, letrec, if
-# const, var,         unit, func
+    return parse_anf_e_from_code(code_words[idx+1:], info_words[idx+1:])
