@@ -128,7 +128,7 @@ aaa()
 """
 
 bool_op_test = """
-if (a or b) and d:
+if (a or b or c or d):
     print("asdf")
 """
 def toSSA_and_print():

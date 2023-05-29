@@ -476,8 +476,13 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if isinstance(stmt, ast.BinOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
-    elif isinstance(stmt, ast.BoolOp): # TODO
-        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values])
+    elif isinstance(stmt, ast.BoolOp):
+        result = SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values[-2:]])
+        values = stmt.values[:-2]
+        while len(values) > 0:
+            result = SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, values[-1], st_nr, is_load), result])
+            values = values[:-1]
+        return result
     elif isinstance(stmt, ast.UnaryOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)])
     elif isinstance(stmt, ast.Call):
