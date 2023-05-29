@@ -297,8 +297,8 @@ buffer_assignments = {}
 def print_anf_with_prov_info(anf_parent: ANFNode):
     out = anf_parent.print()
     prov = anf_parent.get_prov_info(None)
-    max_chars = max([len(line) for line in out.split('\n')]) + 6
-    return '\n'.join([line + (max_chars - len(line)) * ' ' + '#' + info for line, info in zip(out.split('\n'), prov.split('\n'))])
+    max_chars = max([len(line) + line.count('\t') * 3 for line in out.split('\n')]) + 2
+    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + '#' + info for line, info in zip(out.split('\n'), prov.split('\n'))])
 
 def parse_anf_from_text(code: str):
     code = code.strip()
