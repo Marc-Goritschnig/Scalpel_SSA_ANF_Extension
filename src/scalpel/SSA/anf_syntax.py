@@ -342,7 +342,7 @@ def parse_anf_e_from_code(code_words, info_words):
         next_word = code_words[count]
 
     if count > 1:
-        return ANF_E_APP([parse_anf_v_from_code(code_words[i], info_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0], info_words[0]))
+        return ANF_E_APP([parse_anf_v_from_code(code_words[i], info_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0], info_words[0][1:]))
     else:
         return parse_anf_v_from_code(code_words[0], info_words[0])
 
