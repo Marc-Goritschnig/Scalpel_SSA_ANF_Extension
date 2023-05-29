@@ -7,70 +7,26 @@ import codegen
 from src.scalpel.core.mnode import MNode
 from src.scalpel.SSA.const import SSA
 
-
-
-
-class SSACode:
-
-    def __init__(self, cfg: CFG):
-        #pNode = ProcedureNodeP(VariableOrLabelNodeX('Name'),  VariableOrLabelListNodeXHead([]), BlockNodeB, procedure_after: ProcedureNodeP)
-        self.parse_cfg_to_SSA_code(cfg)
-
-    def parse_cfg(self, block):
-        for stmt in block.statements:
-            # New Function
-            if isinstance(stmt, ast.FunctionDef):
-                #print('Found Function')
-                print(codegen.to_source(stmt))
-
-            # New Class
-            elif isinstance(stmt, ast.ClassDef):
-                #print('Found Class')
-                print(codegen.to_source(stmt))
-
-            # Global assignments
-            elif isinstance(stmt, ast.Assign):
-                #print('Found assignment')
-                print(codegen.to_source(stmt))
-                pass
-
-            # Others
-            else:
-                pass
-
-    def parse_cfg_to_SSA_code(self, cfg: CFG):
-        self.parse_cfg_bfs([cfg.entryblock], 0)
-
-    def parse_cfg_bfs(self, blocks, depth):
-        next_blocks = []
-        print("Depth", depth)
-        for block in blocks:
-            self.parse_cfg(block)
-            if block.exits:
-                for exit in block.exits:
-                    next_blocks.append(exit.target)
-        if len(next_blocks) > 0:
-            self.parse_cfg_bfs(next_blocks, depth + 1)
-        # Id of the block.
-#        self.id = id
-        # Statements in the block.
-#        self.statements = []
-        # Calls to functions inside the block (represents context switches to
-        # some functions' CFGs).
-#        self.func_calls = []
-        # Links to predecessors in a control flow graph.
-#        self.predecessors = []
-        # Links to the next blocks in a control flow graph.
-#        self.exits = []
+font = {'assign': '←',
+        'phi': 'φ'}
 
 
 class SSANode:
     def __init__(self):
         pass
 
-    def print(self, nesting_lvl):
+    def print(self, lvl):
         return 'not implemented'
 
+    def enable_print_ascii(self):
+        global font
+        font = {'assign': '<-',
+                'phi': 'PHI'}
+
+    def enable_print_code(self):
+        global font
+        font = {'assign': '←',
+                'phi': 'φ'}
 
 class SSA_V(SSANode):
     def __init__(self, value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL):
@@ -79,6 +35,8 @@ class SSA_V(SSANode):
     def print(self, lvl):
         return f"{self.value.print(lvl)}"
 
+    def print_latex(self, lvl):
+        return ""
 
 class SSA_L(SSA_V):
     def __init__(self, label: str):
@@ -86,6 +44,9 @@ class SSA_L(SSA_V):
 
     def print(self, lvl):
         return f"{self.label}"
+
+    def print_latex(self, lvl):
+        return ""
 
 
 class SSA_V_CONST(SSA_V):
@@ -95,6 +56,9 @@ class SSA_V_CONST(SSA_V):
     def print(self, lvl):
         return f"{self.value}"
 
+    def print_latex(self, lvl):
+        return ""
+
 
 class SSA_V_VAR(SSA_V):
     def __init__(self, name: str):
@@ -102,6 +66,9 @@ class SSA_V_VAR(SSA_V):
 
     def print(self, lvl):
         return f"{self.name}"
+
+    def print_latex(self, lvl):
+        return ""
 
 
 class SSA_V_FUNC_CALL(SSA_V):
@@ -112,6 +79,9 @@ class SSA_V_FUNC_CALL(SSA_V):
     def print(self, lvl):
         return f"{self.name.print(lvl) + print_args(self.args, lvl)}"
 
+    def print_latex(self, lvl):
+        return ""
+
 
 class SSA_E(SSANode):
     def __init__(self, term: SSA_E_ASS | SSA_E_ASS_PHI | SSA_E_GOTO | SSA_E_IF_ELSE | SSA_E_RET):
@@ -120,6 +90,9 @@ class SSA_E(SSANode):
     def print(self, lvl):
         return "" # implemented in child nodes
 
+    def print_latex(self, lvl):
+        return ""
+
 
 class SSA_E_ASS_PHI(SSA_E):
     def __init__(self, var: SSA_V, args: [SSA_V]):
@@ -127,7 +100,10 @@ class SSA_E_ASS_PHI(SSA_E):
         self.args: [SSA_V] = args
 
     def print(self, lvl):
-        return self.var.print(lvl) + ' ← φ' + print_args(self.args, lvl)
+        return self.var.print(lvl) + ' ' + font['assign'] + ' ' + font['phi'] + print_args(self.args, lvl)
+
+    def print_latex(self, lvl):
+        return ""
 
 
 class SSA_E_ASS(SSA_E):
@@ -136,7 +112,10 @@ class SSA_E_ASS(SSA_E):
         self.value: SSA_V = value
 
     def print(self, lvl):
-        return f"{self.var.print(lvl)+ ' ← ' + self.value.print(lvl)}"
+        return f"{self.var.print(lvl)+ ' ' + font['assign'] + ' ' + self.value.print(lvl)}"
+
+    def print_latex(self, lvl):
+        return ""
 
 
 class SSA_E_GOTO(SSA_E):
@@ -145,6 +124,9 @@ class SSA_E_GOTO(SSA_E):
 
     def print(self, lvl):
         return f"{'goto L' + self.label.print(lvl)}"
+
+    def print_latex(self, lvl):
+        return ""
 
 
 class SSA_E_RET(SSA_E):
@@ -156,6 +138,9 @@ class SSA_E_RET(SSA_E):
             return 'ret'
         return f"ret {self.value.print(lvl)}"
 
+    def print_latex(self, lvl):
+        return ""
+
 
 class SSA_E_IF_ELSE(SSA_E):
     def __init__(self, test: SSA_V, term_if: SSA_E, term_else: SSA_E):
@@ -166,6 +151,9 @@ class SSA_E_IF_ELSE(SSA_E):
     def print(self, lvl):
         new_line = '\n'
         return f"{'if ' + self.test.print(lvl) + ' then ' + self.term_if.print(lvl) + new_line + get_indentation(lvl) + 'else ' + self.term_else.print(lvl)}"
+
+    def print_latex(self, lvl):
+        return ""
 
 
 class SSA_B(SSANode):
@@ -181,6 +169,9 @@ class SSA_B(SSANode):
         #    return print_terms(self.terms, lvl)
         return get_indentation(lvl) + f"{'L' + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
 
+    def print_latex(self, lvl):
+        return ""
+
 
 class SSA_P(SSANode):
     def __init__(self, name: SSA_V_VAR, args: [SSA_V], blocks: [SSA_B]):
@@ -192,22 +183,36 @@ class SSA_P(SSANode):
         # return '\n\n'.join([b.print(0) for b in self.blocks])
         return 'proc ' + self.name.print(0) + print_args(self.args, 0) + '\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}\n'
 
+    def print_latex(self):
+        return ""
+
 
 class SSA_AST(SSANode):
     def __init__(self, procs: [SSA_P], blocks: [SSA_B]):
         self.procs: [SSA_P] = procs
         self.blocks: [SSA_B] = blocks
 
-    def print(self):
-        return '\n'.join([p.print() for p in self.procs]) + '\n\n'.join([b.print(0) for b in self.blocks]) # + '\n' + self.ret_term.print(0)
+    def print(self, lvl=0):
+        return '\n'.join([p.print() for p in self.procs]) + '\n\n'.join([b.print(lvl) for b in self.blocks]) #  + '\n' + self.ret_term.print(0)
+
+    def print_latex(self, lvl=0):
+        return ""
 
 
 def print_args(args: [SSANode], lvl):
     return '(' + ', '.join([arg.print(lvl) for arg in args]) + ')'
 
 
+def print_args_latex(args: [SSANode], lvl):
+    return ""
+
+
 def print_terms(terms: [SSANode], lvl):
     return ';\n'.join([(get_indentation(lvl) + term.print(lvl)) for term in terms if term is not None]) + ';'
+
+
+def print_terms_latex(terms: [SSANode], lvl):
+    return ""
 
 
 def get_indentation(nesting_lvl):

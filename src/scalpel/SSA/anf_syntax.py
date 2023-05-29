@@ -2,28 +2,41 @@ from __future__ import annotations
 
 from src.scalpel.SSA.ssa_syntax import *
 
+import re
+font = {'lambda_sign': 'λ'}
+
 
 class ANFNode:
     def __init__(self):
         pass
 
-    def print(self, nesting_lvl):
+    def print(self, lvl):
         return 'not implemented'
+
+    def enable_print_ascii(self):
+        global font
+        font = {'lambda_sign': 'lambda '}
+
+
+    def enable_print_code(self):
+        global font
+        font = {'lambda_sign': 'λ'}
+
 
 
 class ANF_V(ANFNode):
-    def __init__(self, value: ANF_V_CONST | ANF_V_VAR | ANF_V_FUNC):
-        self.value: ANF_V_CONST | ANF_V_VAR | ANF_V_FUNC = value
+    def __init__(self, value: str):
+        self.value: str = value
 
-    def print(self, lvl):
-        return f"{self.value.print()}"
+    def print(self, lvl, prov_info: str = ''):
+        return f"{self.value}"
 
 
 class ANF_V_CONST(ANF_V):
     def __init__(self, value: str):
         self.value: str = value
 
-    def print(self, lvl):
+    def print(self, lvl, prov_info: str = ''):
         return f"{self.value}"
 
 
@@ -31,7 +44,7 @@ class ANF_V_VAR(ANF_V):
     def __init__(self, name: str):
         self.name: str = name
 
-    def print(self, lvl):
+    def print(self, lvl, prov_info: str = ''):
         return f"{self.name}"
 
 
@@ -39,7 +52,7 @@ class ANF_V_UNIT(ANF_V):
     def __init__(self):
         pass
 
-    def print(self, lvl):
+    def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + "unit"
 
 
@@ -48,14 +61,14 @@ class ANF_V_FUNC(ANF_V):
         self.input_var: ANF_V = input_var
         self.term: ANF_E = term
 
-    def print(self, lvl):
+    def print(self, lvl, prov_info: str = ''):
         if self.input_var is None:
             if issubclass(type(self.term), ANF_V):
-                return f"λ . {self.term.print(lvl)}"
-            return f"λ . \n{self.term.print(lvl)}"
+                return f"{font['lambda_sign']} . {self.term.print(lvl)}"
+            return f"{font['lambda_sign']} . \n{self.term.print(lvl)}"
         if issubclass(type(self.term), ANF_V):
-            return f"λ{self.input_var.print(0)} . {self.term.print(lvl)}"
-        return f"λ{self.input_var.print(0)} . \n{self.term.print(lvl)}"
+            return f"{font['lambda_sign']}{self.input_var.print(0)} . {self.term.print(lvl)}"
+        return f"{font['lambda_sign']}{self.input_var.print(0)} . \n{self.term.print(lvl)}"
 
 
 class ANF_E(ANFNode):
@@ -71,7 +84,7 @@ class ANF_E_APP(ANF_E):
         self.params: [ANF_V_VAR] = params
         self.name: ANF_V_VAR = name
 
-    def print(self, lvl):
+    def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
 
@@ -81,7 +94,7 @@ class ANF_E_LET(ANF_E):
         self.term1: ANF_E = term1
         self.term2: ANF_E = term2
 
-    def print(self, lvl):
+    def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
 
 
@@ -91,7 +104,7 @@ class ANF_E_LETREC(ANF_E):
         self.term1: ANF_E = term1
         self.term2: ANF_E = term2
 
-    def print(self, lvl):
+    def print(self, lvl=0, prov_info: str = ''):
         # assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
         if isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET):
             return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + '\n' + self.term1.print(lvl + 1) + '\n' + get_indentation(lvl) + 'in \n' + self.term2.print(lvl + 1)
@@ -105,12 +118,12 @@ class ANF_E_IF(ANF_E):
         self.term_if: ANF_E = term_if
         self.term_else: ANF_E = term_else
 
-    def print(self, lvl):
+    def print(self, lvl, prov_info: str = ''):
         return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
 
 
 def get_indentation(nesting_lvl):
-    return '  ' * nesting_lvl
+    return '\t' * nesting_lvl
 
 
 def parse_ssa_to_anf(ssa: SSA_AST):
@@ -248,3 +261,64 @@ def get_buffer_variable():
 buffer_assignments = {}
 
 
+def parse_anf_from_text(code: str):
+    code = code.strip()
+    code = re.sub(' +', ' ', code)
+    return parse_anf_e_from_code([word for line in code.split('\n') for word in line.strip().split(' ')])
+
+keywords = ['let', 'letrec', 'lambda', 'unit', 'if', 'then', 'else', 'in']
+def parse_anf_e_from_code(code_words):
+    next_word = code_words[0]
+    if next_word == 'let':
+        variable = ANF_V_VAR(code_words[1])
+        right = parse_anf_e_from_code(code_words[3:])
+        _in = get_other_section_part(code_words[1:], ['let', 'letrec'], ['in'])
+        return ANF_E_LET(variable, right, _in)
+    if next_word == 'letrec':
+        variable = ANF_V_VAR(code_words[1])
+        right = parse_anf_e_from_code(code_words[3:])
+        _in = get_other_section_part(code_words[1:], ['let', 'letrec'], ['in'])
+        return ANF_E_LETREC(variable, right, _in)
+    if next_word == 'unit':
+        return ANF_V_UNIT()
+    if next_word == 'lambda':
+        variable = ANF_V_VAR(code_words[1])
+        rest = code_words[3:]
+        if code_words[1] == '.':
+            variable = None
+            rest = code_words[2:]
+        return ANF_V_FUNC(variable, parse_anf_e_from_code(rest))
+    if next_word == 'if':
+        then_part = get_other_section_part(code_words[1:], ['if'], ['then'])
+        else_part = get_other_section_part(code_words[1:], ['if'], ['else'])
+        return ANF_E_IF(parse_anf_e_from_code(code_words[1:]), then_part, else_part)
+
+    count = 0
+    while count + 1 < len(code_words) and next_word not in keywords:
+        count += 1
+        next_word = code_words[count]
+
+    if count > 1:
+        return ANF_E_APP([parse_anf_v_from_code(code_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0]))
+    else:
+        return parse_anf_v_from_code(code_words[0])
+
+
+def parse_anf_v_from_code(code_word):
+    return ANF_V_VAR(code_word)
+
+
+def get_other_section_part(code_words: [str], open_keys: [str], close_keys: [str]):
+    indentation = 1
+    idx = 0
+    for i, w in enumerate(code_words):
+        if w in open_keys:
+            indentation += 1
+        elif w in close_keys:
+            indentation -= 1
+        if indentation == 0:
+            idx = i
+            break
+    return parse_anf_e_from_code(code_words[idx+1:])
+# Anfe- App,          let, letrec, if
+# const, var,         unit, func

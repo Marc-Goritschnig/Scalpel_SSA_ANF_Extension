@@ -1,5 +1,5 @@
-from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf
-from src.scalpel.SSA.ssa_syntax import SSACode, PY_to_SSA_AST
+from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text
+from src.scalpel.SSA.ssa_syntax import PY_to_SSA_AST
 from src.scalpel.core.mnode import MNode
 from src.scalpel.SSA.const import SSA
 from staticfg import CFGBuilder
@@ -134,16 +134,27 @@ def toSSA_and_print():
     m_ssa = SSA()
 
     ssa_ast = PY_to_SSA_AST(for_test)
+    ssa_ast.enable_print_ascii()
     print()
-    print(ssa_ast.print())
+    print(ssa_ast.print(0))
 
     anf_ast = parse_ssa_to_anf(ssa_ast)
+    anf_ast.enable_print_ascii()
     print()
     print(anf_ast.print(0))
 
+    with open('output/ssa_parsed.txt', 'w') as f:
+        f.write(ssa_ast.print(0))
 
-    cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')
-    cfg.build_visual('./output/exampleCFG', 'pdf')
+    with open('output/anf_parsed.txt', 'w') as f:
+        f.write(anf_ast.print(0))
+
+    # TODO: ASCII and LATEX format prints
+    parsed = parse_anf_from_text(anf_ast.print(0))
+    print('parsed:')
+    print(parsed.print(0))
+    #cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')
+    #cfg.build_visual('./output/exampleCFG', 'pdf')
 
 
 def IsEasyChairQuery(input: str) -> bool:
