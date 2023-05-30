@@ -3,6 +3,7 @@ import ast
 
 from src.scalpel.cfg import CFG
 import codegen
+import re
 
 from src.scalpel.core.mnode import MNode
 from src.scalpel.SSA.const import SSA
@@ -281,9 +282,37 @@ def update_used_vars():
         used_var_names.append(tup[1])
 
 
+def reformat_py_code(code):
+    replaced = True
+    while replaced:
+        print("Code version:")
+        print(code)
+        tree = ast.parse(code)
+        replaced = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ListComp):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                lines[node.lineno - 1] = line[:node.col_offset] + '_buffer_py_0' + line[node.end_col_offset:]
+
+                new_lines = []
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_lines.append(indentation * ' ' + '_buffer_py_0 = []')
+                for g in node.generators:
+                    new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
+                    indentation += 4
+                new_lines.append(indentation * ' ' + '_buffer_py_0.append(' + ast.unparse(node.elt) + ')')
+                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                code = '\n'.join(lines)
+                replaced = True
+                break
+
+    return code
+
 def PY_to_SSA_AST(code_str: str):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names
 
+    code_str = reformat_py_code(code_str)
     mnode = MNode("local")
     mnode.source = code_str
     mnode.gen_ast()
@@ -388,6 +417,26 @@ def get_buffer_var():
     return buffer_var_name + str(buffer_counter - 1)
 
 
+#def PS_ListComp(prov_info, block_ref, block, stmt, first_in_proc, nr_of_list_comp_in_block):
+    # L1
+    #   x = []
+    #   goto L1-2
+    # L1-2
+    #   for implementation with L1-2-2
+    #   goto L1-3
+    # L1-3
+    # use x
+#    buffer_var = get_buffer_var()
+#    buffer_assignments[stmt] = buffer_var
+
+
+#    stmts.append(SSA_E_ASS(SSA_V_VAR(iter_var), PS_E(prov_info, block, stmt.iter, 0, False)))
+
+#    old_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
+#    var_name, idx = old_iter_var.name.rsplit('_')
+#    old_iter_var.name = var_name + '_' + str(int(idx) - 1)
+
+
 def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     # LX
     # l = list
@@ -431,7 +480,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
 
     stmts2.append(SSA_E_IF_ELSE(SSA_V_VAR(buffer), SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target)), else_ref))
 
-    block.exits[0].target.exits[0].target = CFGBlockMock(new_block_name)
+    block.exits[0].target.exits[len(block.exits[0].target.exits) - 1].target = CFGBlockMock(new_block_name, block.exits)
     addon_statements_per_block[block.exits[0].target] = [SSA_E_ASS(old_iter_var2, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)]))]
     b2 = SSA_B(SSA_L(new_block_name), stmts2, first_in_proc)
 
@@ -439,9 +488,14 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
 
 addon_statements_per_block = {}
 
+class Exit:
+  def __init__(self, target):
+    self.target = target
+
 class CFGBlockMock:
-  def __init__(self, id):
+  def __init__(self, id, exits):
     self.id = id
+    self.exits = exits
 
 def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
@@ -483,6 +537,8 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             result = SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)])
             values = values[1:]
         return result
+    elif isinstance(stmt, ast.ListComp):
+        return buffer_assignments[stmt]
     elif isinstance(stmt, ast.UnaryOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)])
     elif isinstance(stmt, ast.Call):
@@ -567,3 +623,4 @@ def PS_B_REF(prov_info, curr_block):
     block_counter += 1
     return block_refs[curr_block]
 
+buffer_assignments = {}

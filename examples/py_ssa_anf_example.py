@@ -131,6 +131,26 @@ bool_op_test = """
 if (a or b or c or d):
     print("asdf")
 """
+
+lambda_test="""
+x = lambda a : a + 10
+print(x(5))
+"""
+
+list_comp_test="""
+x = [1,2,3,4,5]
+y = [i + y for i in x for y in x]
+print(y)
+"""
+list_comp_test2="""
+x = [1,2,3,4,5]
+_buffer_py_0 = []
+for i in x:
+    for y in x:
+        _buffer_py_0.append(i + y)
+y = _buffer_py_0
+print(y)
+"""
 def toSSA_and_print():
     mnode = MNode("local")
     mnode.source = code_str
@@ -138,7 +158,11 @@ def toSSA_and_print():
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-    ssa_ast = PY_to_SSA_AST(ccc)
+    cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')
+    cfg.build_visual('./output/exampleCFG', 'pdf')
+
+
+    ssa_ast = PY_to_SSA_AST(list_comp_test)
     ssa_ast.enable_print_ascii()
     print()
     print(ssa_ast.print(0))
@@ -152,14 +176,17 @@ def toSSA_and_print():
         f.write(ssa_ast.print(0))
 
     with open('output/anf_parsed.txt', 'w') as f:
-        f.write(print_anf_with_prov_info(anf_ast))
+        f.write(anf_ast.print(0))
+        #f.write(print_anf_with_prov_info(anf_ast))
 
-    # TODO: ASCII and LATEX format prints
-    parsed = parse_anf_from_text(print_anf_with_prov_info(anf_ast))
-    print('parsed:')
-    print(parsed.print(0))
-    #cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')
-    #cfg.build_visual('./output/exampleCFG', 'pdf')
+    # TODO: loop in loop
+    # TODO: SSA - Lambda, ListComp,    ?? NamedExpr, SetComp, DictComp, GeneratorExp
+    # TODO: LATEX format prints
+
+    #parsed = parse_anf_from_text(print_anf_with_prov_info(anf_ast))
+    #print('parsed:')
+    #print(parsed.print(0))
+
 
 
 def IsEasyChairQuery(input: str) -> bool:

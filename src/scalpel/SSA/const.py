@@ -316,9 +316,12 @@ class SSA:
                         block_phi_variables_needed[df_block_id].append(af_ident)
 
 
-    def recursive_find_var_usages_in_predecessors(self, var_searched, block_renamed_stored, block_renamed_phi_stored, predecessors):
+    def recursive_find_var_usages_in_predecessors(self, var_searched, block_renamed_stored, block_renamed_phi_stored, predecessors, searched_preds = []):
         nrs = []
+
         for pred in predecessors:
+            if pred in searched_preds:
+                continue
             found = False
             pred = pred.source
             highest_nr = -1
@@ -330,7 +333,7 @@ class SSA:
             if highest_nr >= 0: # found an entry
                 nrs.append(highest_nr)
             else:
-                nrs += self.recursive_find_var_usages_in_predecessors(var_searched, block_renamed_stored, block_renamed_phi_stored, pred.predecessors)
+                nrs += self.recursive_find_var_usages_in_predecessors(var_searched, block_renamed_stored, block_renamed_phi_stored, pred.predecessors, searched_preds + predecessors)
         return nrs
 
 
