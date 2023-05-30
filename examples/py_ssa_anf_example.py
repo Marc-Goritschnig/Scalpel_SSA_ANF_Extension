@@ -133,8 +133,10 @@ if (a or b or c or d):
 """
 
 lambda_test="""
-x = lambda a : a + 10
-print(x(5))
+def ab():
+    x = lambda a : a + 10
+    print(x(5))
+ab()
 """
 
 list_comp_test="""
@@ -161,8 +163,7 @@ def toSSA_and_print():
     cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')
     cfg.build_visual('./output/exampleCFG', 'pdf')
 
-
-    ssa_ast = PY_to_SSA_AST(list_comp_test)
+    ssa_ast = PY_to_SSA_AST(lambda_test)
     ssa_ast.enable_print_ascii()
     print()
     print(ssa_ast.print(0))

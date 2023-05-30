@@ -282,6 +282,22 @@ def update_used_vars():
         used_var_names.append(tup[1])
 
 
+def replace_code_with_content(lines, line_from, line_to, col_from, col_to, content):
+    l_idx = line_from
+    if line_from == line_to:
+        line = lines[line_from]
+        lines[line_from] = line[:col_from] + content + line[col_to:]
+    else:
+        while l_idx <= line_to:
+            line = lines[l_idx]
+            if l_idx == line_from:
+                lines[l_idx] = line[:col_from]
+            elif l_idx == line_to:
+                lines[l_idx] = ''
+            else:
+                lines[l_idx] = line[col_to:]
+            l_idx += 1
+
 def reformat_py_code(code):
     replaced = True
     while replaced:
@@ -290,18 +306,33 @@ def reformat_py_code(code):
         tree = ast.parse(code)
         replaced = False
         for node in ast.walk(tree):
-            if isinstance(node, ast.ListComp):
+            if isinstance(node, ast.Lambda):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
-                lines[node.lineno - 1] = line[:node.col_offset] + '_buffer_py_0' + line[node.end_col_offset:]
+                buffer_var = get_buffer_var()
+                replace_code_with_content(lines, node.lineno - 1, node.end_lineno - 1, node.col_offset, node.end_col_offset, buffer_var)
 
                 new_lines = []
                 indentation = len(re.findall(r"^ *", line)[0])
-                new_lines.append(indentation * ' ' + '_buffer_py_0 = []')
+                new_lines.append(indentation * ' ' + 'def ' + buffer_var + '(' + ast.unparse(node.args) + '):')
+                indentation += 4
+                new_lines += [(' ' * indentation + l) for l in ('return ' + ast.unparse(node.body)).split('\n')]
+                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                code = '\n'.join(lines)
+                replaced = True
+            if isinstance(node, ast.ListComp):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                buffer_var = get_buffer_var()
+                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+
+                new_lines = []
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_lines.append(indentation * ' ' + buffer_var + ' = []')
                 for g in node.generators:
                     new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
                     indentation += 4
-                new_lines.append(indentation * ' ' + '_buffer_py_0.append(' + ast.unparse(node.elt) + ')')
+                new_lines.append(indentation * ' ' + buffer_var + '.append(' + ast.unparse(node.elt) + ')')
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
@@ -361,6 +392,8 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
             cfg)
         procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))))
         update_used_vars()
+        if len(cfg.functioncfgs) > 0:
+            procs += PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
     return procs
 
 

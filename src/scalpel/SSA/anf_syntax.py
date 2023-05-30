@@ -180,7 +180,7 @@ def SA_PS(ps: [SSA_P], inner_term):
     if len(ps) == 1:
         let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label))), inner_term)
     else:
-        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label))), SA_PS[1:])
+        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label))), SA_PS(ps[1:], inner_term))
 
     return let_rec
 
