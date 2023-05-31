@@ -1,13 +1,11 @@
 from __future__ import annotations
 import ast
-
-from src.scalpel.cfg import CFG
-import codegen
 import re
 
 from src.scalpel.core.mnode import MNode
 from src.scalpel.SSA.const import SSA
 
+debug = True
 font = {'assign': '←',
         'phi': 'φ'}
 
@@ -29,6 +27,7 @@ class SSANode:
         font = {'assign': '←',
                 'phi': 'φ'}
 
+
 class SSA_V(SSANode):
     def __init__(self, value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL):
         self.value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL = value
@@ -38,6 +37,7 @@ class SSA_V(SSANode):
 
     def print_latex(self, lvl):
         return ""
+
 
 class SSA_L(SSA_V):
     def __init__(self, label: str):
@@ -262,26 +262,45 @@ def get_first_block_in_proc(blocks: [SSA_B]):
             return b
 
 
-block_counter = 1
-block_refs = {}
+# Global variables to store SSA variable data while transforming a single CFG
 ssa_results_stored = {}
 ssa_results_loads = {}
 ssa_results_phi_stored = {}
 ssa_results_phi_loads = {}
 const_dict = {}
-used_var_names = []
+
+# Global used variable names to prevent duplicate names
+used_var_names = {}
+
+# Prefix for new variables from the transformation
+buffer_var_name = "_ssa_buffer_"
+buffer_counter = 0  # Index for new buffer variables (postfix)
+
+# Mapping dict of nodes to their new buffer variable name to be replaced with when occurring in the translation
+buffer_assignments = {}
+
+# Mapping of blocks to their corresponding label if already created
+block_refs = {}
 
 
-def update_used_vars():
+# Update the list of global names to include the new ones found in the last checked cfg
+def update_used_vars(vars_stored, constants):
     global used_var_names
-    for block_vars in ssa_results_stored.values():
-        for term_vars in block_vars:
-            for var in term_vars:
-                used_var_names.append(var)
-    for tup in const_dict.keys():
-        used_var_names.append(tup[1])
+    used_var_names.update(get_used_vars(vars_stored, constants))
 
 
+def get_used_vars(vars_stored, constants):
+    used_vars = {}
+    for block_terms in vars_stored.values():
+        for term_vars in block_terms:
+            for var, idx in term_vars.items():
+                used_vars[var] = idx
+    for tup in constants.keys():
+        used_vars[tup[0]] = tup[1]
+    return used_vars
+
+
+# Replace the content in lines corresponding to the position given with line[from:to] and col[from:to] with content
 def replace_code_with_content(lines, line_from, line_to, col_from, col_to, content):
     l_idx = line_from
     if line_from == line_to:
@@ -298,11 +317,14 @@ def replace_code_with_content(lines, line_from, line_to, col_from, col_to, conte
                 lines[l_idx] = line[col_to:]
             l_idx += 1
 
-def reformat_py_code(code):
+
+# Preprocessing of Python code before parsing it into SSA
+def preprocess_py_code(code):
     replaced = True
     while replaced:
-        print("Code version:")
-        print(code)
+        if debug:
+            print("Preprocessing code version:")
+            print(code)
         tree = ast.parse(code)
         replaced = False
         for node in ast.walk(tree):
@@ -320,7 +342,7 @@ def reformat_py_code(code):
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
-            if isinstance(node, ast.ListComp):
+            elif isinstance(node, ast.ListComp):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
                 buffer_var = get_buffer_var()
@@ -337,31 +359,47 @@ def reformat_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
-
     return code
+
 
 def PY_to_SSA_AST(code_str: str):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names
 
-    code_str = reformat_py_code(code_str)
+    # Preprocess Python code (Slicing and simple transformations (ex. List Comp -> For Loop))
+    code_str = preprocess_py_code(code_str)
+
+    # Create CFG from code and SSA parser Object
     mnode = MNode("local")
     mnode.source = code_str
     mnode.gen_ast()
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
-    procs = PS_FS(None, cfg.functioncfgs, cfg.function_args, m_ssa)
+    # Compute the phi nodes of the main CFG
     ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names)
-    print('ssa_results_stored',ssa_results_stored)
-    print('ssa_results_loads',ssa_results_loads)
-    print('ssa_results_phi_stored',ssa_results_phi_stored)
-    print('ssa_results_phi_loads',ssa_results_phi_loads)
-    print('const_dict',const_dict)
+    # Parse the main CFG
+    main_cfg_proc = PS_BS(ProvInfo(), sort_blocks(cfg.get_all_blocks()))
+    # Update global tracking variables of used variable names etc for main CFG
+    update_used_vars(ssa_results_stored, const_dict)
+    prov_info = ProvInfo()
+    prov_info.parent_vars = get_used_vars(ssa_results_stored, const_dict)
 
-    base_proc_name = "SSA_START_PROC"
-    # proc = SSA_P(SSA_V_VAR(base_proc_name), ) #+ PS_FS(cfg.functioncfgs))
-    ssa_ast = SSA_AST(procs, PS_BS(None, sort_blocks(cfg.get_all_blocks())))
-    update_used_vars()
+    # Parse all the functions first
+    procs = PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
+
+
+    # Create SSA AST
+    ssa_ast = SSA_AST(procs, main_cfg_proc)
+
+    if debug:
+        print('Main CFG SSA paring variable results:')
+        print('ssa_results_stored', ssa_results_stored)
+        print('ssa_results_loads', ssa_results_loads)
+        print('ssa_results_phi_stored', ssa_results_phi_stored)
+        print('ssa_results_phi_loads', ssa_results_phi_loads)
+        print('const_dict', const_dict)
+        print('\n\n\n')
+
     return ssa_ast
 
 
@@ -370,8 +408,8 @@ def sort_blocks(blocks):
     #print([b.id for b in blocks])
     return blocks
 
-def PS_PHI(curr_block):
 
+def PS_PHI(curr_block):
     assignments = []
     for stored, loaded in zip(ssa_results_phi_stored[curr_block.id], ssa_results_phi_loads[curr_block.id]):
         var_name = list(stored.keys())[0]
@@ -385,19 +423,24 @@ def PS_PHI(curr_block):
 def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
     procs = []
+
     for key in function_cfgs:
         cfg = function_cfgs[key]
         args = function_args[key]
-        ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(
-            cfg)
+        # Compute the phi nodes of the current function CFG
+        ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars)
+        # Parse the current functino CFG into SSA
         procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))))
-        update_used_vars()
+        # Update the used variable names
+        update_used_vars(ssa_results_stored, const_dict)
+        prov_info = prov_info.copy()
+        prov_info.parent_vars = get_used_vars(ssa_results_stored, const_dict)
+        # If there are function in this function, parse those now
         if len(cfg.functioncfgs) > 0:
             procs += PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
+
+
     return procs
-
-
-# blocks_checked = []
 
 
 def PS_BS(prov_info, blocks):
@@ -407,7 +450,7 @@ def PS_BS(prov_info, blocks):
     #    PS_B_REF(prov_info, b)
     i = 0
     for b in blocks:
-        blocks_parsed += PS_B(None, b, i == 0)
+        blocks_parsed += PS_B(prov_info, b, i == 0)
         i += 1
 
     return blocks_parsed
@@ -438,10 +481,6 @@ def PS_B(prov_info, block, first_in_proc):
             return [b]
         #exits = reduce(lambda a, b: a+b, [PS_B(prov_info, exit_b.target) for exit_b in block.exits])
         return [b]# + exits
-
-
-buffer_var_name = "_ssa_buffer_"
-buffer_counter = 0
 
 
 def get_buffer_var():
@@ -613,7 +652,7 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     elif isinstance(stmt, ast.Attribute):
         return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.attr), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)])
     elif isinstance(stmt, ast.Name):
-        name = get_global_unique_name(stmt.id)
+        name = get_global_unique_name(stmt.id, prov_info.parent_vars)
         if is_load:
             if name in ssa_results_loads[curr_block.id][st_nr]:
                 var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][name])]
@@ -629,7 +668,18 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     return stmt
 
 
-def get_global_unique_name(var_name):
+class ProvInfo():
+    def __init__(self):
+        self.parent_vars = {}
+
+    def copy(self):
+        p = ProvInfo()
+        p.parent_vars = self.parent_vars
+        return p
+
+def get_global_unique_name(var_name, parent_vars):
+    if var_name in parent_vars:
+        return var_name
     idx = 2
     appendix = ""
     if var_name not in used_var_names:
@@ -647,13 +697,9 @@ def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
 
 
 def PS_B_REF(prov_info, curr_block):
-    global block_counter
     if curr_block in block_refs:
         return block_refs[curr_block]
 
-    #block_refs[curr_block] = SSA_L(str(block_counter))
     block_refs[curr_block] = SSA_L(str(curr_block.id))
-    block_counter += 1
     return block_refs[curr_block]
 
-buffer_assignments = {}
