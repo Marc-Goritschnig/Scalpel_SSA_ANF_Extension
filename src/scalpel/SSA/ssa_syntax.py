@@ -262,6 +262,24 @@ def get_first_block_in_proc(blocks: [SSA_B]):
             return b
 
 
+# Custom class to mock a cfg block
+class CFGBlockMock:
+    def __init__(self, id, exits):
+        self.id = id
+        self.exits = exits
+
+
+# Class to store transformation information
+class ProvInfo:
+    def __init__(self):
+        self.parent_vars = {}
+
+    def copy(self):
+        p = ProvInfo()
+        p.parent_vars = self.parent_vars
+        return p
+
+
 # Global variables to store SSA variable data while transforming a single CFG
 ssa_results_stored = {}
 ssa_results_loads = {}
@@ -282,13 +300,16 @@ buffer_assignments = {}
 # Mapping of blocks to their corresponding label if already created
 block_refs = {}
 
+# Stores additional statments to be added at the end of the block
+addon_statements_per_block = {}
+
 
 # Update the list of global names to include the new ones found in the last checked cfg
 def update_used_vars(vars_stored, constants):
     global used_var_names
     used_var_names.update(get_used_vars(vars_stored, constants))
 
-
+# Returns the variables set in the two given dicts together with their index
 def get_used_vars(vars_stored, constants):
     used_vars = {}
     for block_terms in vars_stored.values():
@@ -319,6 +340,8 @@ def replace_code_with_content(lines, line_from, line_to, col_from, col_to, conte
 
 
 # Preprocessing of Python code before parsing it into SSA
+# This function converts the following nodes into simpler nodes:
+# Lambda, ListComp
 def preprocess_py_code(code):
     replaced = True
     while replaced:
@@ -381,12 +404,13 @@ def PY_to_SSA_AST(code_str: str):
     main_cfg_proc = PS_BS(ProvInfo(), sort_blocks(cfg.get_all_blocks()))
     # Update global tracking variables of used variable names etc for main CFG
     update_used_vars(ssa_results_stored, const_dict)
+
+    # Update the provenance info for the child cfgs (functions which have references to the parents variables)
     prov_info = ProvInfo()
     prov_info.parent_vars = get_used_vars(ssa_results_stored, const_dict)
 
-    # Parse all the functions first
+    # Parse all the functions cfgs
     procs = PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
-
 
     # Create SSA AST
     ssa_ast = SSA_AST(procs, main_cfg_proc)
@@ -403,12 +427,14 @@ def PY_to_SSA_AST(code_str: str):
     return ssa_ast
 
 
+# Sorts the blocks
 def sort_blocks(blocks):
     #blocks.sort(key=lambda x: x.id)
     #print([b.id for b in blocks])
     return blocks
 
 
+# Collect all phi nodes in the given block
 def PS_PHI(curr_block):
     assignments = []
     for stored, loaded in zip(ssa_results_phi_stored[curr_block.id], ssa_results_phi_loads[curr_block.id]):
@@ -420,6 +446,7 @@ def PS_PHI(curr_block):
     return assignments
 
 
+# Parse the given function cfgs and sub functions
 def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
     procs = []
@@ -427,27 +454,29 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
     for key in function_cfgs:
         cfg = function_cfgs[key]
         args = function_args[key]
+
         # Compute the phi nodes of the current function CFG
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars)
+
         # Parse the current functino CFG into SSA
         procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))))
+
         # Update the used variable names
         update_used_vars(ssa_results_stored, const_dict)
         prov_info = prov_info.copy()
         prov_info.parent_vars = get_used_vars(ssa_results_stored, const_dict)
+
         # If there are function in this function, parse those now
         if len(cfg.functioncfgs) > 0:
             procs += PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
 
-
     return procs
 
 
+# Parse a list of blocks from Python AST into SSA AST
 def PS_BS(prov_info, blocks):
     blocks_parsed = []
-    # Initialize block ids to have the same as in the parsed SSA / maybe change to block references instead of id
-    #for b in blocks:
-    #    PS_B_REF(prov_info, b)
+
     i = 0
     for b in blocks:
         blocks_parsed += PS_B(prov_info, b, i == 0)
@@ -456,73 +485,44 @@ def PS_BS(prov_info, blocks):
     return blocks_parsed
 
 
+# Parse a block from Python AST into SSA AST
 def PS_B(prov_info, block, first_in_proc):
     global block_counter, blocks_checked
 
-    # if block in blocks_checked:
-    #    return []
-    # blocks_checked.append(block)
+    # Init the block reference
     block_ref = PS_B_REF(prov_info, block)
 
+    # Handle for nodes separately (in case of a for the first node will be the for node)
     if isinstance(block.statements[0], ast.For):
         return PS_FOR(prov_info, block_ref, block, block.statements[0], first_in_proc)
     else:
+        # Build the statement list beginning with phi assignments, the stmts and a goto
         stmts = PS_PHI(block)
         stmt_lists = [PS_S(prov_info, block, stmt, idx) for idx, stmt in enumerate(block.statements) if not isinstance(stmt, ast.FunctionDef)]
         stmts += [st for l in stmt_lists for st in l]
 
+        # Add additional statements generated by sub processes like in the case of for nodes
         if block in addon_statements_per_block:
             stmts += addon_statements_per_block[block]
+
+        # If there is only one exit add a goto otherwise the exits will be handled in the node itself (like if-block)
         if len(block.exits) == 1:
             stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
+
+        # Create a new SSA Block
         b = SSA_B(block_ref, stmts, first_in_proc)
 
-        if len(block.exits) == 0:
-            return [b]
-        #exits = reduce(lambda a, b: a+b, [PS_B(prov_info, exit_b.target) for exit_b in block.exits])
-        return [b]# + exits
+        return [b]
 
 
+# Returns a new buffer variable with a unique name
 def get_buffer_var():
     global buffer_counter
     buffer_counter = buffer_counter + 1
     return buffer_var_name + str(buffer_counter - 1)
 
 
-#def PS_ListComp(prov_info, block_ref, block, stmt, first_in_proc, nr_of_list_comp_in_block):
-    # L1
-    #   x = []
-    #   goto L1-2
-    # L1-2
-    #   for implementation with L1-2-2
-    #   goto L1-3
-    # L1-3
-    # use x
-#    buffer_var = get_buffer_var()
-#    buffer_assignments[stmt] = buffer_var
-
-
-#    stmts.append(SSA_E_ASS(SSA_V_VAR(iter_var), PS_E(prov_info, block, stmt.iter, 0, False)))
-
-#    old_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
-#    var_name, idx = old_iter_var.name.rsplit('_')
-#    old_iter_var.name = var_name + '_' + str(int(idx) - 1)
-
-
 def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
-    # LX
-    # l = list
-    # i = next(l)
-    # LX_2:
-    # i_1 <- PHI(i_0, i_1)
-    # buf <- i is None
-    # if buf:
-    #   goto LX+2
-    # else:
-    #   goto LX+1
-    # LX+1
-    # Body of loop
-    # i_1 = next(l)
     global addon_statements_per_block
     new_block_name = block_ref.label + '_2'
 
@@ -558,17 +558,8 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
 
     return [b, b2]
 
-addon_statements_per_block = {}
 
-class Exit:
-  def __init__(self, target):
-    self.target = target
-
-class CFGBlockMock:
-  def __init__(self, id, exits):
-    self.id = id
-    self.exits = exits
-
+# Parse a Python statement
 def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
         if isinstance(stmt.targets[0], ast.Tuple):
@@ -599,6 +590,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         return []
 
 
+# Parse a Python expression
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if isinstance(stmt, ast.BinOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
@@ -668,15 +660,7 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     return stmt
 
 
-class ProvInfo():
-    def __init__(self):
-        self.parent_vars = {}
-
-    def copy(self):
-        p = ProvInfo()
-        p.parent_vars = self.parent_vars
-        return p
-
+# Get the variables global unique name, considers parent variables to be used
 def get_global_unique_name(var_name, parent_vars):
     if var_name in parent_vars:
         return var_name
@@ -689,6 +673,8 @@ def get_global_unique_name(var_name, parent_vars):
         idx += 1
     return var_name + appendix
 
+
+# Recursively generate a call stack with ops and comparators
 def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
     if len(ops) == 1:
         return SSA_V_FUNC_CALL(SSA_V_VAR(type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
@@ -696,6 +682,7 @@ def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
     return PS_MAP2(new_left, ops[1:], comparators[1:], st_nr)
 
 
+# Saves a blocks unique references and returns it
 def PS_B_REF(prov_info, curr_block):
     if curr_block in block_refs:
         return block_refs[curr_block]
