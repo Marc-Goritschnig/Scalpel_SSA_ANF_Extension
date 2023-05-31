@@ -180,12 +180,15 @@ a()
 
 
 debug_mode = True
-output_folder = 'output'
+
 python_code_path = None
+output_folder = 'output'
+
 ssa_file = 'ssa_parsed.txt'
 anf_file = 'anf_parsed.txt'
 anf_with_prov_file = 'anf_parsed_with_prov_info.txt'
 
+default_code_to_transform = lambda_test  # Change this value to transform another code
 print_CFG_graph = True
 
 
@@ -201,7 +204,7 @@ def transform():
         os.makedirs(output_folder)
 
     # Default code to be parsed if no file is given (for quick testing with above created examples)
-    py_code = lambda_test
+    py_code = default_code_to_transform
 
     # Read python code from input file given
     if python_code_path is not None:
