@@ -212,7 +212,7 @@ def transform():
             py_code = file.read()
 
     # Create a SSA AST from python code
-    ssa_ast = PY_to_SSA_AST(py_code)
+    ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
     ssa_ast.enable_print_ascii()
     if debug_mode:
         print("Transformed SSA tree printed:")
@@ -220,7 +220,7 @@ def transform():
         print('\n\n\n')
 
     # Create an ANF AST from SSA AST
-    anf_ast = parse_ssa_to_anf(ssa_ast)
+    anf_ast = parse_ssa_to_anf(ssa_ast, debug_mode)
     anf_ast.enable_print_ascii()
     if debug_mode:
         print("Transformed AST tree printed:")

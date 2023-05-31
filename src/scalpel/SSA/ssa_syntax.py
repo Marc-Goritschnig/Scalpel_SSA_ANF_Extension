@@ -5,7 +5,7 @@ import re
 from src.scalpel.core.mnode import MNode
 from src.scalpel.SSA.const import SSA
 
-debug = True
+debug_mode = True
 font = {'assign': '←',
         'phi': 'φ'}
 
@@ -358,7 +358,7 @@ def replace_code_with_content(lines, line_from, line_to, col_from, col_to, conte
 def preprocess_py_code(code):
     replaced = True
     while replaced:
-        if debug:
+        if debug_mode:
             print("Preprocessing code version:")
             print(code)
         tree = ast.parse(code)
@@ -398,9 +398,10 @@ def preprocess_py_code(code):
     return code
 
 
-def PY_to_SSA_AST(code_str: str):
-    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names
+def PY_to_SSA_AST(code_str: str, debug: bool):
+    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names, debug_mode
 
+    debug_mode = debug
     # Preprocess Python code (Slicing and simple transformations (ex. List Comp -> For Loop))
     code_str = preprocess_py_code(code_str)
 
@@ -428,7 +429,7 @@ def PY_to_SSA_AST(code_str: str):
     # Create SSA AST
     ssa_ast = SSA_AST(procs, main_cfg_proc)
 
-    if debug:
+    if debug_mode:
         print('Main CFG SSA paring variable results:')
         print('ssa_results_stored', ssa_results_stored)
         print('ssa_results_loads', ssa_results_loads)

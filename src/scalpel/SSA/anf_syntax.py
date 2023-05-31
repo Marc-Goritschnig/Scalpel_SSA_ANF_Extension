@@ -4,7 +4,7 @@ from src.scalpel.SSA.ssa_syntax import *
 import re
 
 font = {'lambda_sign': 'λ'}
-
+debug_mode = False
 
 class ANFNode:
     def __init__(self):
@@ -178,7 +178,9 @@ def get_indentation(nesting_lvl):
     return '\t' * nesting_lvl
 
 
-def parse_ssa_to_anf(ssa: SSA_AST):
+def parse_ssa_to_anf(ssa: SSA_AST, debug: bool):
+    global debug_mode
+    debug_mode = debug
     return SA(ssa)
 
 
