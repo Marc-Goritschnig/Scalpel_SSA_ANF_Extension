@@ -29,18 +29,19 @@ class SSANode:
 
 
 class SSA_V(SSANode):
-    def __init__(self, value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL):
-        self.value: SSA_V_CONST | SSA_V_VAR | SSA_V_FUNC_CALL = value
+    def __init__(self):
+        super().__init__()
 
     def print(self, lvl):
-        return f"{self.value.print(lvl)}"
+        return ''
 
     def print_latex(self, lvl):
-        return ""
+        return ''
 
 
 class SSA_L(SSA_V):
     def __init__(self, label: str):
+        super().__init__()
         self.label: str = label
 
     def print(self, lvl):
@@ -52,6 +53,7 @@ class SSA_L(SSA_V):
 
 class SSA_V_CONST(SSA_V):
     def __init__(self, value: str):
+        super().__init__()
         self.value: str = value
 
     def print(self, lvl):
@@ -63,6 +65,7 @@ class SSA_V_CONST(SSA_V):
 
 class SSA_V_VAR(SSA_V):
     def __init__(self, name: str):
+        super().__init__()
         self.name: str = name
 
     def print(self, lvl):
@@ -73,9 +76,10 @@ class SSA_V_VAR(SSA_V):
 
 
 class SSA_V_FUNC_CALL(SSA_V):
-    def __init__(self, name: SSA_L | SSA_V, args: SSA_V):
-        self.name: SSA_V_VAR = name
-        self.args = args
+    def __init__(self, name: SSA_L | SSA_V, args: [SSA_V]):
+        super().__init__()
+        self.name: SSA_L | SSA_V = name
+        self.args: [SSA_V] = args
 
     def print(self, lvl):
         return f"{self.name.print(lvl) + print_args(self.args, lvl)}"
@@ -85,11 +89,11 @@ class SSA_V_FUNC_CALL(SSA_V):
 
 
 class SSA_E(SSANode):
-    def __init__(self, term: SSA_E_ASS | SSA_E_ASS_PHI | SSA_E_GOTO | SSA_E_IF_ELSE | SSA_E_RET):
-        self.term: SSA_E_ASS | SSA_E_ASS_PHI | SSA_E_GOTO | SSA_E_IF_ELSE | SSA_E_RET = term
+    def __init__(self):
+        super().__init__()
 
     def print(self, lvl):
-        return "" # implemented in child nodes
+        return ""
 
     def print_latex(self, lvl):
         return ""
@@ -97,6 +101,7 @@ class SSA_E(SSANode):
 
 class SSA_E_ASS_PHI(SSA_E):
     def __init__(self, var: SSA_V, args: [SSA_V]):
+        super().__init__()
         self.var: SSA_V = var
         self.args: [SSA_V] = args
 
@@ -109,6 +114,7 @@ class SSA_E_ASS_PHI(SSA_E):
 
 class SSA_E_ASS(SSA_E):
     def __init__(self, var: SSA_V, value: SSA_V):
+        super().__init__()
         self.var: SSA_V = var
         self.value: SSA_V = value
 
@@ -121,6 +127,7 @@ class SSA_E_ASS(SSA_E):
 
 class SSA_E_GOTO(SSA_E):
     def __init__(self, label: SSA_L):
+        super().__init__()
         self.label: SSA_L = label
 
     def print(self, lvl):
@@ -131,8 +138,9 @@ class SSA_E_GOTO(SSA_E):
 
 
 class SSA_E_RET(SSA_E):
-    def __init__(self, value: SSA_V):
-        self.value: SSA_V = value
+    def __init__(self, value: SSA_V | None):
+        super().__init__()
+        self.value: SSA_V | None = value
 
     def print(self, lvl):
         if self.value is None:
@@ -145,6 +153,7 @@ class SSA_E_RET(SSA_E):
 
 class SSA_E_IF_ELSE(SSA_E):
     def __init__(self, test: SSA_V, term_if: SSA_E, term_else: SSA_E):
+        super().__init__()
         self.test: SSA_V = test
         self.term_if: SSA_E = term_if
         self.term_else: SSA_E = term_else
@@ -159,6 +168,7 @@ class SSA_E_IF_ELSE(SSA_E):
 
 class SSA_B(SSANode):
     def __init__(self, label: SSA_L, terms: [SSA_E], first_in_proc: bool):
+        super().__init__()
         self.label: SSA_L = label
         self.terms: [SSA_E] = terms
         self.first_in_proc: bool = first_in_proc
@@ -176,11 +186,12 @@ class SSA_B(SSANode):
 
 class SSA_P(SSANode):
     def __init__(self, name: SSA_V_VAR, args: [SSA_V], blocks: [SSA_B]):
+        super().__init__()
         self.name: SSA_V_VAR = name
         self.args: [SSA_V] = args
         self.blocks: [SSA_B] = blocks
 
-    def print(self):
+    def print(self, lvl=0):
         # return '\n\n'.join([b.print(0) for b in self.blocks])
         return 'proc ' + self.name.print(0) + print_args(self.args, 0) + '\n{\n' + '\n\n'.join([b.print(1) for b in self.blocks]) + '\n}\n'
 
@@ -190,6 +201,7 @@ class SSA_P(SSANode):
 
 class SSA_AST(SSANode):
     def __init__(self, procs: [SSA_P], blocks: [SSA_B]):
+        super().__init__()
         self.procs: [SSA_P] = procs
         self.blocks: [SSA_B] = blocks
 
@@ -220,13 +232,13 @@ def get_indentation(nesting_lvl):
     return '  ' * nesting_lvl
 
 
-def get_block_by_id(ssa_ast: SSA_AST, id: str) -> SSA_B:
+def get_block_by_id(ssa_ast: SSA_AST, b_id: str) -> SSA_B | None:
     for p in ssa_ast.procs:
         for b in p.blocks:
-            if b.label.label == id:
+            if b.label.label == b_id:
                 return b
     for b in ssa_ast.blocks:
-        if b.label.label == id:
+        if b.label.label == b_id:
             return b
     return None
 
@@ -264,8 +276,8 @@ def get_first_block_in_proc(blocks: [SSA_B]):
 
 # Custom class to mock a cfg block
 class CFGBlockMock:
-    def __init__(self, id, exits):
-        self.id = id
+    def __init__(self, b_id, exits):
+        self.id = b_id
         self.exits = exits
 
 
@@ -308,6 +320,7 @@ addon_statements_per_block = {}
 def update_used_vars(vars_stored, constants):
     global used_var_names
     used_var_names.update(get_used_vars(vars_stored, constants))
+
 
 # Returns the variables set in the two given dicts together with their index
 def get_used_vars(vars_stored, constants):
@@ -361,7 +374,7 @@ def preprocess_py_code(code):
                 indentation = len(re.findall(r"^ *", line)[0])
                 new_lines.append(indentation * ' ' + 'def ' + buffer_var + '(' + ast.unparse(node.args) + '):')
                 indentation += 4
-                new_lines += [(' ' * indentation + l) for l in ('return ' + ast.unparse(node.body)).split('\n')]
+                new_lines += [(' ' * indentation + body_l) for body_l in ('return ' + ast.unparse(node.body)).split('\n')]
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
@@ -429,8 +442,8 @@ def PY_to_SSA_AST(code_str: str):
 
 # Sorts the blocks
 def sort_blocks(blocks):
-    #blocks.sort(key=lambda x: x.id)
-    #print([b.id for b in blocks])
+    # blocks.sort(key=lambda x: x.id)
+    # print([b.id for b in blocks])
     return blocks
 
 

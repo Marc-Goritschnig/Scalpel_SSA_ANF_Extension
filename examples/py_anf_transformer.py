@@ -201,7 +201,7 @@ def transform():
         os.makedirs(output_folder)
 
     # Default code to be parsed if no file is given (for quick testing with above created examples)
-    py_code = fun_in_fun_test
+    py_code = lambda_test
 
     # Read python code from input file given
     if python_code_path is not None:

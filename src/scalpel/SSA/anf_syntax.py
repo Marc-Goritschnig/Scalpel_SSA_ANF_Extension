@@ -10,7 +10,7 @@ class ANFNode:
     def __init__(self):
         pass
 
-    def print(self, lvl):
+    def print(self, lvl = 0):
         return 'not implemented'
 
     def enable_print_ascii(self):
@@ -25,11 +25,16 @@ class ANFNode:
         return ''
 
 
-class ANF_E(ANFNode):
+class ANF_EV(ANFNode):
     def __init__(self):
         super().__init__()
 
-    def print(self, lvl):
+
+class ANF_E(ANF_EV):
+    def __init__(self):
+        super().__init__()
+
+    def print(self, lvl = 0):
         return ''
 
     def get_prov_info(self, prov_info):
@@ -37,12 +42,12 @@ class ANF_E(ANFNode):
 
 
 class ANF_E_APP(ANF_E):
-    def __init__(self, params: [ANF_V_VAR], name: ANF_V_VAR):
+    def __init__(self, params: [ANF_V], name: ANF_V):
         super().__init__()
-        self.params: [ANF_V_VAR] = params
-        self.name: ANF_V_VAR = name
+        self.params: [ANF_V] = params
+        self.name: ANF_V = name
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
     def get_prov_info(self, prov_info):
@@ -50,13 +55,13 @@ class ANF_E_APP(ANF_E):
 
 
 class ANF_E_LET(ANF_E):
-    def __init__(self, var: ANF_V_VAR, term1: ANF_E, term2: ANF_E):
+    def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E):
         super().__init__()
-        self.var: ANF_V_VAR = var
+        self.var: ANF_V = var
         self.term1: ANF_E = term1
         self.term2: ANF_E = term2
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
@@ -64,10 +69,10 @@ class ANF_E_LET(ANF_E):
 
 
 class ANF_E_LETREC(ANF_E):
-    def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E):
+    def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E):
         super().__init__()
         self.var: ANF_V = var
-        self.term1: ANF_E = term1
+        self.term1: ANF_EV = term1
         self.term2: ANF_E = term2
 
     def print(self, lvl=0, prov_info: str = ''):
@@ -91,18 +96,18 @@ class ANF_E_IF(ANF_E):
         self.term_if: ANF_E = term_if
         self.term_else: ANF_E = term_else
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
         return 'if;' + self.test.get_prov_info(None) + ';then\n' + self.term_if.get_prov_info(None) + '\nelse\n' + self.term_else.get_prov_info(None)
 
 
-class ANF_V(ANFNode, ANF_E):
+class ANF_V(ANF_EV):
     def __init__(self):
         super().__init__()
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         return f""
 
     def get_prov_info(self, prov_info):
@@ -114,7 +119,7 @@ class ANF_V_CONST(ANF_V):
         super().__init__()
         self.value: str = value
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         return f"{self.value}"
 
     def get_prov_info(self, prov_info):
@@ -126,7 +131,7 @@ class ANF_V_VAR(ANF_V):
         super().__init__()
         self.name: str = name
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         return f"{self.name}"
 
     def get_prov_info(self, prov_info):
@@ -137,7 +142,7 @@ class ANF_V_UNIT(ANF_V):
     def __init__(self):
         super().__init__()
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         return get_indentation(lvl) + "unit"
 
     def get_prov_info(self, prov_info):
@@ -145,12 +150,12 @@ class ANF_V_UNIT(ANF_V):
 
 
 class ANF_V_FUNC(ANF_V):
-    def __init__(self, input_var: ANF_V, term: ANF_E):
+    def __init__(self, input_var: ANF_V, term: ANF_EV):
         super().__init__()
         self.input_var: ANF_V = input_var
-        self.term: ANF_E = term
+        self.term: ANF_EV = term
 
-    def print(self, lvl, prov_info: str = ''):
+    def print(self, lvl = 0, prov_info: str = ''):
         if self.input_var is None:
             if issubclass(type(self.term), ANF_V):
                 return f"{font['lambda_sign']} . {self.term.print(lvl)}"
@@ -244,9 +249,12 @@ def SA_BS(bs: [SSA_B], inner_call):
 
 
 def SA_ES(b: SSA_B, terms: [SSA_E]):
-    if len(terms) == 0: return ANF_V_UNIT()
+    if len(terms) == 0:
+        return ANF_V_UNIT()
+
     term = terms[0]
-    if term is None: return ANF_V_UNIT()
+    if term is None:
+        return ANF_V_UNIT()
 
     if isinstance(term, SSA_E_ASS):
         unwrap_inner_applications_naming(term.value)
