@@ -178,10 +178,6 @@ def a():
 a()
 """
 
-
-debug_mode = True
-
-python_code_path = None
 output_folder = 'output'
 
 ssa_file = 'ssa_parsed.txt'
@@ -189,7 +185,10 @@ anf_file = 'anf_parsed.txt'
 anf_with_prov_file = 'anf_parsed_with_prov_info.txt'
 
 default_code_to_transform = lambda_test  # Change this value to transform another code
-print_CFG_graph = True
+
+python_code_path = None
+debug_mode = True
+print_CFG_graph = False
 
 
 def transform():
@@ -264,9 +263,6 @@ if __name__ == '__main__':
     if len(sys.argv) == 1:
         print("Usage: python script.py <file_path> <debug_mode> <visualize_cfg>")
         print('Debug mode is active, local code will be transformed\n')
-        python_code_path = None
-        debug_mode = True
-        print_CFG_graph = False
     else:
         # Retrieve the arguments
         python_code_path = sys.argv[1]
