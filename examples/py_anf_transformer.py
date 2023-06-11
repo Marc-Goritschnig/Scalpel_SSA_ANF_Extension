@@ -245,7 +245,15 @@ def transform():
         print(parsed.print(0))
         print('\n\n\n')
 
-    # Transform the ast tree back to Python
+    # Parsing the anf code back to Python
+    anf_to_python = parsed.parse_anf_to_python({})
+    if debug_mode:
+        print('Parsed Python code from ANF printed:')
+        print(anf_to_python)
+        print('\n\n\n')
+
+
+# Transform the ast tree back to Python
     # TODO: Implementation of back transformation
 
     # Other TODOs

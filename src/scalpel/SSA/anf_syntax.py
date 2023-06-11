@@ -24,10 +24,21 @@ class ANFNode:
     def get_prov_info(self, prov_info):
         return ''
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return None
 
 class ANF_EV(ANFNode):
     def __init__(self):
         super().__init__()
+
+    def print(self, lvl = 0):
+        return ''
+
+    def get_prov_info(self, prov_info):
+        return ''
+
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return None
 
 
 class ANF_E(ANF_EV):
@@ -40,6 +51,8 @@ class ANF_E(ANF_EV):
     def get_prov_info(self, prov_info):
         return ''
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return None
 
 class ANF_E_APP(ANF_E):
     def __init__(self, params: [ANF_V], name: ANF_V):
@@ -53,6 +66,8 @@ class ANF_E_APP(ANF_E):
     def get_prov_info(self, prov_info):
         return 'f' + self.name.get_prov_info(None) + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return get_indentation(lvl) + self.name.parse_anf_to_python(assignments) + '(' + ','.join([p.print() for p in self.params]) + ')'
 
 class ANF_E_LET(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E):
@@ -67,6 +82,8 @@ class ANF_E_LET(ANF_E):
     def get_prov_info(self, prov_info):
         return 'let;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + ';in\n' + self.term2.get_prov_info(None)
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return get_indentation(lvl) + self.var.parse_anf_to_python(assignments) + ' = ' + self.term1.parse_anf_to_python(assignments) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
 
 class ANF_E_LETREC(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E):
@@ -88,6 +105,18 @@ class ANF_E_LETREC(ANF_E):
         else:
             return 'letrec;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        if isinstance(self.var, ANF_V_VAR):
+            if self.var.name.startswith(block_identifier) and isinstance(self.term2, ANF_E_APP):
+                if self.term2.name.name == self.var.name:
+                    # L1 = XXX in L1
+                    # Return just XXX and store XXX if still L1 is called somewhere else
+                    assignments[self.var.name] = self.term2
+                    return self.term1.parse_anf_to_python(assignments, lvl, False)
+        elif isinstance(self.term2, ANF_V_FUNC):
+            return get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+        return get_indentation(lvl) + 'def ' + self.var.print(0, None) + '():\n' + self.term1.parse_anf_to_python(assignments, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+
 
 class ANF_E_IF(ANF_E):
     def __init__(self, test: ANF_V_VAR, term_if: ANF_E, term_else: ANF_E):
@@ -102,6 +131,8 @@ class ANF_E_IF(ANF_E):
     def get_prov_info(self, prov_info):
         return 'if;' + self.test.get_prov_info(None) + ';then\n' + self.term_if.get_prov_info(None) + '\nelse\n' + self.term_else.get_prov_info(None)
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return get_indentation(lvl) + 'ANF_E_IF'
 
 class ANF_V(ANF_EV):
     def __init__(self):
@@ -113,6 +144,8 @@ class ANF_V(ANF_EV):
     def get_prov_info(self, prov_info):
         return ''
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return get_indentation(lvl) + 'ANF_V'
 
 class ANF_V_CONST(ANF_V):
     def __init__(self, value: str):
@@ -125,6 +158,8 @@ class ANF_V_CONST(ANF_V):
     def get_prov_info(self, prov_info):
         return 'c'
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return get_indentation(lvl) + self.value
 
 class ANF_V_VAR(ANF_V):
     def __init__(self, name: str):
@@ -137,6 +172,8 @@ class ANF_V_VAR(ANF_V):
     def get_prov_info(self, prov_info):
         return 'v'
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return get_indentation(lvl) + self.name
 
 class ANF_V_UNIT(ANF_V):
     def __init__(self):
@@ -148,6 +185,8 @@ class ANF_V_UNIT(ANF_V):
     def get_prov_info(self, prov_info):
         return 'u'
 
+    def parse_anf_to_python(self, assignments, lvl=0):
+        return ''
 
 class ANF_V_FUNC(ANF_V):
     def __init__(self, input_var: ANF_V, term: ANF_EV):
@@ -172,6 +211,13 @@ class ANF_V_FUNC(ANF_V):
         if issubclass(type(self.term), ANF_V):
             return 'lambda;' + self.input_var.get_prov_info(None) + ';.;' + self.term.get_prov_info(None)
         return 'lambda;' + self.input_var.get_prov_info(None) + ';.\n' + self.term.get_prov_info(None)
+
+    def parse_anf_to_python(self, assignments, lvl=0, print_variables=True):
+        if not print_variables:
+            return self.term.parse_anf_to_python(assignments, lvl)
+        if self.input_var is None:
+            return '():\n' + self.term.parse_anf_to_python(assignments, lvl)
+        return '(' + self.input_var.parse_anf_to_python(assignments) + '):\n' + self.term.parse_anf_to_python(assignments, lvl)
 
 
 def get_indentation(nesting_lvl):
