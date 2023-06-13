@@ -115,7 +115,24 @@ class ANF_E_LETREC(ANF_E):
                     return self.term1.parse_anf_to_python(assignments, lvl, False)
         elif isinstance(self.term2, ANF_V_FUNC):
             return get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
-        return get_indentation(lvl) + 'def ' + self.var.print(0, None) + '():\n' + self.term1.parse_anf_to_python(assignments, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+
+        vars = get_function_parameter_recursive(self.term1)
+        next_term = get_next_non_function_term(self.term1)
+        return get_indentation(lvl) + 'def ' + self.var.print(0, None) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+
+
+def get_function_parameter_recursive(next):
+    if isinstance(next, ANF_V_FUNC):
+        return [next.input_var.print(0, None)] + get_function_parameter_recursive(next.term)
+    else:
+        return []
+
+
+def get_next_non_function_term(next):
+    if isinstance(next, ANF_V_FUNC):
+        return get_next_non_function_term(next.term)
+    else:
+        return next
 
 
 class ANF_E_IF(ANF_E):
@@ -215,9 +232,12 @@ class ANF_V_FUNC(ANF_V):
     def parse_anf_to_python(self, assignments, lvl=0, print_variables=True):
         if not print_variables:
             return self.term.parse_anf_to_python(assignments, lvl)
+        vars = get_function_parameter_recursive(self.term1)
+        next_term = get_next_non_function_term(self.term1)
         if self.input_var is None:
-            return '():\n' + self.term.parse_anf_to_python(assignments, lvl)
-        return '(' + self.input_var.parse_anf_to_python(assignments) + '):\n' + self.term.parse_anf_to_python(assignments, lvl)
+            return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, lvl)
+        vars += [self.input_var.parse_anf_to_python(assignments)]
+        return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, lvl)
 
 
 def get_indentation(nesting_lvl):
@@ -261,11 +281,26 @@ def SA_PS(ps: [SSA_P], inner_term):
 
     # If we have the last procedure we return a letrec of this proc using the inner term
     p: SSA_P = ps[0]
+
     if len(ps) == 1:
-        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label))), inner_term)
+        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
+
+        args = p.args
+        while len(args) > 0:
+            first_term = ANF_V_FUNC(SA_V(args[0]), first_term)
+            args = args[1:]
+
+        let_rec = ANF_E_LETREC(SA_V(p.name), first_term, inner_term)
     # If we have still more than one procedure we return a letrec of this proc using a recursive call to build the other procs as inner term
     else:
-        let_rec = ANF_E_LETREC(SA_V(p.name), SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label))), SA_PS(ps[1:], inner_term))
+        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
+
+        args = p.args
+        while len(args) > 0:
+            first_term = ANF_V_FUNC(SA_V(args[0]), first_term)
+            args = args[1:]
+
+        let_rec = ANF_E_LETREC(SA_V(p.name), first_term, SA_PS(ps[1:], inner_term))
 
     return let_rec
 
