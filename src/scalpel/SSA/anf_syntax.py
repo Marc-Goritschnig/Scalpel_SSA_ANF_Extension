@@ -67,7 +67,7 @@ class ANF_E_APP(ANF_E):
         return 'f' + self.name.get_prov_info(None) + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
 
     def parse_anf_to_python(self, assignments, lvl=0):
-        return get_indentation(lvl) + self.name.parse_anf_to_python(assignments) + '(' + ','.join([p.print() for p in self.params]) + ')'
+        return get_indentation(lvl) + self.name.parse_anf_to_python(assignments) + '(' + ','.join([p.parse_anf_to_python(assignments, 0) for p in self.params]) + ')'
 
 class ANF_E_LET(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E):
@@ -83,6 +83,12 @@ class ANF_E_LET(ANF_E):
         return 'let;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + ';in\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, lvl=0):
+        name = self.var.parse_anf_to_python(assignments)
+        if name == '_':
+            return get_indentation(lvl) + self.term1.parse_anf_to_python(assignments) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+        elif name.startswith('_buffer_'):
+            assignments[name] = self.term1.parse_anf_to_python(assignments)
+            return self.term2.parse_anf_to_python(assignments, lvl)
         return get_indentation(lvl) + self.var.parse_anf_to_python(assignments) + ' = ' + self.term1.parse_anf_to_python(assignments) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
 
 class ANF_E_LETREC(ANF_E):
@@ -190,6 +196,8 @@ class ANF_V_VAR(ANF_V):
         return 'v'
 
     def parse_anf_to_python(self, assignments, lvl=0):
+        if self.name in assignments:
+            return get_indentation(lvl) + assignments[self.name]
         return get_indentation(lvl) + self.name
 
 class ANF_V_UNIT(ANF_V):
