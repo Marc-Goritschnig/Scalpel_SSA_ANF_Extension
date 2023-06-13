@@ -6,6 +6,38 @@ import re
 font = {'lambda_sign': 'λ'}
 debug_mode = False
 
+function_mapping = {
+    '_And': '%s and %s',
+    '_Or': '%s or %s',
+    '_Add': '%s + %s',
+    '_Sub': '%s - %s',
+    '_Mult': '%s * %s',
+    '_MatMult ': 'unknown',
+    '_Div': '%s / %s',
+    '_Mod ': '%s % %s',
+    '_Pow': '%s ** %s',
+    '_LShift': '%s << %s',
+    '_RShift': '%s >> %s',
+    '_BitOr': '%s | %s',
+    '_BitXor': '%s ^ %s',
+    '_BitAnd': '%s & %s',
+    '_FloorDiv': '%s // %s',
+    '_Invert': '~%s',
+    '_Not': 'not %s',
+    '_UAdd': '+%s',
+    '_USub': '-%s',
+    '_Eq': '%s == %s',
+    '_NotEq': '%s != %s',
+    '_Lt': '%s < %s',
+    '_LtE': '%s <= %s',
+    '_Gt': '%s > %s',
+    '_GtE': '%s >= %s',
+    '_Is': '%s is %s',
+    '_IsNot': '%s is not %s',
+    '_In': '%s in %s',
+    '_NotIn': '%s not in %s'
+}
+
 class ANFNode:
     def __init__(self):
         pass
@@ -26,6 +58,7 @@ class ANFNode:
 
     def parse_anf_to_python(self, assignments, lvl=0):
         return None
+
 
 class ANF_EV(ANFNode):
     def __init__(self):
@@ -67,6 +100,13 @@ class ANF_E_APP(ANF_E):
         return 'f' + self.name.get_prov_info(None) + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
 
     def parse_anf_to_python(self, assignments, lvl=0):
+        if isinstance(self.name, ANF_V_CONST):
+            if re.match('L([0-9]|_)*', self.name.value):
+                if self.name.value in assignments:
+                    return assignments[self.name.value].parse_anf_to_python(assignments, lvl)
+        if isinstance(self.name, ANF_V_VAR):
+            if self.name.name in function_mapping:
+                return get_indentation(lvl) + (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, 0) for p in self.params]))
         return get_indentation(lvl) + self.name.parse_anf_to_python(assignments) + '(' + ','.join([p.parse_anf_to_python(assignments, 0) for p in self.params]) + ')'
 
 class ANF_E_LET(ANF_E):
@@ -83,11 +123,11 @@ class ANF_E_LET(ANF_E):
         return 'let;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + ';in\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, lvl=0):
-        name = self.var.parse_anf_to_python(assignments)
+        name = self.var.name
         if name == '_':
             return get_indentation(lvl) + self.term1.parse_anf_to_python(assignments) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
         elif name.startswith('_buffer_'):
-            assignments[name] = self.term1.parse_anf_to_python(assignments)
+            assignments[name] = self.term1
             return self.term2.parse_anf_to_python(assignments, lvl)
         return get_indentation(lvl) + self.var.parse_anf_to_python(assignments) + ' = ' + self.term1.parse_anf_to_python(assignments) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
 
@@ -112,6 +152,19 @@ class ANF_E_LETREC(ANF_E):
             return 'letrec;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, lvl=0):
+
+        ## Check if was For loop
+        #if self.var.name == 'L1': #  re.match('L[0-9]*]', self.var.name):
+        #    ass_iter = self.term1
+        #    iter = ass_iter.term1.parse_anf_to_python(assignments, 0)
+        #    ass_i = self.term2
+        #    i_var = ass_i.var.parse_anf_to_python(assignments, 0)
+        #    return 'for ' + i_var + ' in ' + iter
+
+        if re.match(r'L([0-9]|_)*', self.var.name):
+            assignments[self.var.name] = self.term1.term
+            return self.term2.parse_anf_to_python(assignments, lvl)
+
         if isinstance(self.var, ANF_V_VAR):
             if self.var.name.startswith(block_identifier) and isinstance(self.term2, ANF_E_APP):
                 if self.term2.name.name == self.var.name:
@@ -129,9 +182,9 @@ class ANF_E_LETREC(ANF_E):
 
 def get_function_parameter_recursive(next):
     if isinstance(next, ANF_V_FUNC):
-        return [next.input_var.print(0, None)] + get_function_parameter_recursive(next.term)
-    else:
-        return []
+        if next.input_var is not None:
+            return [next.input_var.print(0, None)] + get_function_parameter_recursive(next.term)
+    return []
 
 
 def get_next_non_function_term(next):
@@ -155,7 +208,7 @@ class ANF_E_IF(ANF_E):
         return 'if;' + self.test.get_prov_info(None) + ';then\n' + self.term_if.get_prov_info(None) + '\nelse\n' + self.term_else.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, lvl=0):
-        return get_indentation(lvl) + 'ANF_E_IF'
+        return get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, lvl) + ':\n' + self.term_if.parse_anf_to_python(assignments, lvl + 1) + '\nelse:\n' + self.term_if.parse_anf_to_python(assignments, lvl + 1) + '\n'
 
 class ANF_V(ANF_EV):
     def __init__(self):
@@ -197,8 +250,12 @@ class ANF_V_VAR(ANF_V):
 
     def parse_anf_to_python(self, assignments, lvl=0):
         if self.name in assignments:
-            return get_indentation(lvl) + assignments[self.name]
-        return get_indentation(lvl) + self.name
+            return get_indentation(lvl) + assignments[self.name].parse_anf_to_python(assignments, lvl)
+        idx = self.name.rfind('_')
+        if idx == -1:
+            idx = len(self.name)
+        name = self.name[0:idx]
+        return get_indentation(lvl) + name
 
 class ANF_V_UNIT(ANF_V):
     def __init__(self):
@@ -240,8 +297,8 @@ class ANF_V_FUNC(ANF_V):
     def parse_anf_to_python(self, assignments, lvl=0, print_variables=True):
         if not print_variables:
             return self.term.parse_anf_to_python(assignments, lvl)
-        vars = get_function_parameter_recursive(self.term1)
-        next_term = get_next_non_function_term(self.term1)
+        vars = get_function_parameter_recursive(self.term)
+        next_term = get_next_non_function_term(self.term)
         if self.input_var is None:
             return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, lvl)
         vars += [self.input_var.parse_anf_to_python(assignments)]
@@ -500,3 +557,73 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
             idx = i
             break
     return parse_anf_e_from_code(code_words[idx + 1:], info_words[idx + 1:])
+
+
+def parse_anf_to_ssa(anf_ast):
+    stmts, blocks, procs = parse_anf_to_ssa2(anf_ast)
+    return SSA_AST(procs, blocks)
+
+
+block_phi_assignment_vars = {}
+buffer_assignments_anf_ssa = {}
+def parse_anf_to_ssa2(term):
+    global block_phi_assignment_vars
+    if isinstance(term, ANF_E_LETREC):
+        if isinstance(term.var, ANF_V_VAR):
+            name = term.var.name
+            if re.match(r'L([0-9]|_)*', name):
+                stmts1, blocks1, procs1 = parse_anf_to_ssa2(term.term1.term)
+                stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
+                phi_ass = []
+                if name in block_phi_assignment_vars:
+                    for var in block_phi_assignment_vars[name]:
+                        max_idx = 0
+                        for arg in block_phi_assignment_vars[name][var]:
+                            idx = int(arg[arg.rfind('_')+1:])
+                            max_idx = max(max_idx, idx)
+                        phi_ass += [SSA_E_ASS_PHI(SSA_V_VAR(var + '_' + str(max_idx+1)), [SSA_V_VAR(arg) for arg in block_phi_assignment_vars[name][var]])]
+                return [], [SSA_B(SSA_L(term.var.name[1:]), phi_ass + stmts1 + stmts2, False)] + blocks1 + blocks2, procs1 + procs2
+        stmts1, blocks1, procs1 = parse_anf_to_ssa2(term.term1)
+        stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
+        return [], [], [SSA_P(SSA_L(term.var.print(0, None)), [], blocks1 + blocks2)] + procs1 + procs2
+    elif isinstance(term, ANF_E_LET):
+        name = term.var.print()
+        # Parse the right assignment side first and check if the left side is a buffer variable
+        stmts1, _      , _      = parse_anf_to_ssa2(term.term1)
+        ass = [SSA_E_ASS(SSA_V_VAR(name), stmts1[0])]
+        # if we have a buffer variable we keep track of it and do not include the assignment in the returned statements
+        if name.startswith('_buffer_'):
+            buffer_assignments_anf_ssa[name] = stmts1[0]
+            ass = []
+        # Parse the following statements
+        stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
+        if name == '_':
+            return stmts1 + stmts2, blocks2, procs2
+        return ass + stmts2, blocks2, procs2
+    elif isinstance(term, ANF_E_APP):
+        name = term.name.print()
+        if re.match(r'L([0-9]|_)*', name):
+            if name not in block_phi_assignment_vars:
+                block_phi_assignment_vars[name] = {}
+            for arg in term.params:
+                arg_name = arg.print()
+                base = arg_name[0:arg_name.rfind('_')]
+                if base not in block_phi_assignment_vars[name]:
+                    block_phi_assignment_vars[name][base] = []
+                block_phi_assignment_vars[name][base].append(arg_name)
+            return [SSA_E_GOTO(SSA_L(name[1:]))], [], []
+        return [SSA_V_FUNC_CALL(SSA_V_VAR(name), [SSA_V_VAR(arg.print()) for arg in term.params])], [], []
+    elif isinstance(term, ANF_E_IF):
+        stmts1, _, _ = parse_anf_to_ssa2(term.term_if)
+        stmts2, _, _ = parse_anf_to_ssa2(term.term_else)
+        return [SSA_E_IF_ELSE(parse_anf_to_ssa2(term.test)[0][0], stmts1[0], stmts2[0])], [], []
+    elif isinstance(term, ANF_V_VAR):
+        if term.name in buffer_assignments_anf_ssa:
+            return [buffer_assignments_anf_ssa[term.name]], [], []
+        return [SSA_V_VAR(term.name)], [], []
+    elif isinstance(term, ANF_V_FUNC):
+        return [], [], []
+    elif isinstance(term, ANF_V_CONST):
+        return [SSA_V_CONST(term.value)], [], []
+    elif isinstance(term, ANF_V_UNIT):
+        return [], [], []

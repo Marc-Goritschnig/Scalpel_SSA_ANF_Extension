@@ -558,7 +558,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     next_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
     stmts2.append(SSA_E_ASS_PHI(next_iter_var, [old_iter_var, old_iter_var2]))
     buffer = get_buffer_var()
-    stmts2.append(SSA_E_ASS(SSA_V_VAR(buffer), SSA_V_FUNC_CALL(SSA_V_VAR(ast.Is.__name__), [next_iter_var, SSA_V_VAR("None")])))
+    stmts2.append(SSA_E_ASS(SSA_V_VAR(buffer), SSA_V_FUNC_CALL(SSA_V_VAR('_' + ast.Is.__name__), [next_iter_var, SSA_V_VAR("None")])))
     if len(block.exits) == 1:
         else_ref = SSA_E_RET(None)
     else:
@@ -607,18 +607,18 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
 # Parse a Python expression
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if isinstance(stmt, ast.BinOp):
-        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
     elif isinstance(stmt, ast.BoolOp):
-        result = SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values[:2]])
+        result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values[:2]])
         values = stmt.values[2:]
         while len(values) > 0:
-            result = SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)])
+            result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)])
             values = values[1:]
         return result
     elif isinstance(stmt, ast.ListComp):
         return buffer_assignments[stmt]
     elif isinstance(stmt, ast.UnaryOp):
-        return SSA_V_FUNC_CALL(SSA_V_VAR(type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)])
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)])
     elif isinstance(stmt, ast.Call):
         if isinstance(stmt.func, ast.Attribute):
             return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.func.attr), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in ([stmt.func.value] + stmt.args)])
@@ -691,8 +691,8 @@ def get_global_unique_name(var_name, parent_vars):
 # Recursively generate a call stack with ops and comparators
 def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
     if len(ops) == 1:
-        return SSA_V_FUNC_CALL(SSA_V_VAR(type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
-    new_left = SSA_V_FUNC_CALL(SSA_V_VAR(type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
+    new_left = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
     return PS_MAP2(new_left, ops[1:], comparators[1:], st_nr)
 
 

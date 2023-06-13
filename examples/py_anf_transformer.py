@@ -1,7 +1,7 @@
 import os
 import sys
 
-from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info
+from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info, parse_anf_to_ssa
 from src.scalpel.SSA.ssa_syntax import PY_to_SSA_AST
 
 # ###########################
@@ -109,6 +109,7 @@ for i in range(5):
     print(i)
 print("a")
 """
+
 for_3_test = """
 for i in range(5):
     print(i)
@@ -184,7 +185,7 @@ ssa_file = 'ssa_parsed.txt'
 anf_file = 'anf_parsed.txt'
 anf_with_prov_file = 'anf_parsed_with_prov_info.txt'
 
-default_code_to_transform = lambda_test  # Change this value to transform another code
+default_code_to_transform = if_else_test  # Change this value to transform another code
 
 python_code_path = None
 debug_mode = True
@@ -250,6 +251,9 @@ def transform():
     if debug_mode:
         print('Parsed Python code from ANF printed:')
         print(anf_to_python)
+        print('\n\n\n')
+        print('Parsed Python code from ANF printed:')
+        print(parse_anf_to_ssa(parsed).print())
         print('\n\n\n')
 
 
