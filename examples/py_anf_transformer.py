@@ -1,6 +1,10 @@
 import os
 import sys
 
+content_root = os.path.abspath(__file__).split('\examples\py_anf_transformer.py')[0]
+if content_root not in sys.path:
+    sys.path.append(content_root)
+
 from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info, parse_anf_to_ssa
 from src.scalpel.SSA.ssa_syntax import PY_to_SSA_AST
 
@@ -249,10 +253,10 @@ def transform():
     # Parsing the anf code back to Python
     anf_to_python = parsed.parse_anf_to_python({})
     if debug_mode:
-        print('Parsed Python code from ANF printed:')
+        print('Parsed Python code from ANF to Python test printed:')
         print(anf_to_python)
         print('\n\n\n')
-        print('Parsed Python code from ANF printed:')
+        print('Parsed Python code from ANF to SSA test printed:')
         print(parse_anf_to_ssa(parsed).print())
         print('\n\n\n')
 

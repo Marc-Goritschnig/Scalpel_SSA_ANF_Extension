@@ -306,7 +306,7 @@ class ANF_V_FUNC(ANF_V):
 
 
 def get_indentation(nesting_lvl):
-    return '\t' * nesting_lvl
+    return '    ' * nesting_lvl
 
 
 def parse_ssa_to_anf(ssa: SSA_AST, debug: bool):
