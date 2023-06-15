@@ -574,6 +574,10 @@ def parse_anf_to_ssa2(term):
             if re.match(r'L([0-9]|_)*', name):
                 stmts1, blocks1, procs1 = parse_anf_to_ssa2(term.term1.term)
                 stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
+                # The first innermost letrec got a simple function call in its "in" term which is artificially added from SSA to ANF to call the first Block and therefore not needed
+                if isinstance(term.term2, ANF_E_APP):
+                    if re.match(r'L([0-9]|_)*', term.term2.name.name):
+                        stmts2, blocks2, procs2 = [], [], []
                 phi_ass = []
                 if name in block_phi_assignment_vars:
                     for var in block_phi_assignment_vars[name]:
