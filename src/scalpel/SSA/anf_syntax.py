@@ -614,13 +614,13 @@ def parse_anf_to_ssa2(term):
             if name not in block_phi_assignment_vars:
                 block_phi_assignment_vars[name] = {}
             for arg in term.params:
-                arg_name = arg.print()
+                arg_name = get_name_from_buffer(arg.print())
                 base = arg_name[0:arg_name.rfind('_')]
                 if base not in block_phi_assignment_vars[name]:
                     block_phi_assignment_vars[name][base] = []
                 block_phi_assignment_vars[name][base].append(arg_name)
             return [SSA_E_GOTO(SSA_L(name[1:]))], [], []
-        return [SSA_V_FUNC_CALL(SSA_V_VAR(name), [SSA_V_VAR(arg.print()) for arg in term.params])], [], []
+        return [SSA_V_FUNC_CALL(SSA_V_VAR(name), [SSA_V_VAR(get_name_from_buffer(arg.print())) for arg in term.params])], [], []
     elif isinstance(term, ANF_E_IF):
         stmts1, _, _ = parse_anf_to_ssa2(term.term_if)
         stmts2, _, _ = parse_anf_to_ssa2(term.term_else)
@@ -635,3 +635,8 @@ def parse_anf_to_ssa2(term):
         return [SSA_V_CONST(term.value)], [], []
     elif isinstance(term, ANF_V_UNIT):
         return [], [], []
+
+def get_name_from_buffer(name):
+    if name in buffer_assignments_anf_ssa:
+        return buffer_assignments_anf_ssa[name].print(0)
+    return name
