@@ -198,6 +198,7 @@ default_code_to_transform = func_test  # Change this value to transform another 
 python_code_path = None
 debug_mode = True
 print_CFG_graph = False
+parse_back = False
 
 
 def transform():
@@ -247,22 +248,23 @@ def transform():
     with open(output_folder + '/' + anf_with_prov_file, 'w') as f:
         f.write(print_anf_with_prov_info(anf_ast))
 
-    # Parsing the anf code back to internal representation of anf
-    parsed = parse_anf_from_text(print_anf_with_prov_info(anf_ast))
-    if debug_mode:
-        print('Parsed anf tree printed:')
-        print(parsed.print(0))
-        print('\n\n\n')
+    if parse_back:
+        # Parsing the anf code back to internal representation of anf
+        parsed = parse_anf_from_text(print_anf_with_prov_info(anf_ast))
+        if debug_mode:
+            print('Parsed anf tree printed:')
+            print(parsed.print(0))
+            print('\n\n\n')
 
-    # Parsing the anf code back to Python
-    anf_to_python = parsed.parse_anf_to_python({})
-    if debug_mode:
-        print('Parsed Python code from ANF to Python test printed:')
-        print(anf_to_python)
-        print('\n\n\n')
-        print('Parsed Python code from ANF to SSA test printed:')
-        print(parse_anf_to_ssa(parsed).print())
-        print('\n\n\n')
+        # Parsing the anf code back to Python
+        anf_to_python = parsed.parse_anf_to_python({})
+        if debug_mode:
+            print('Parsed Python code from ANF to Python test printed:')
+            print(anf_to_python)
+            print('\n\n\n')
+            print('Parsed Python code from ANF to SSA test printed:')
+            print(parse_anf_to_ssa(parsed).print())
+            print('\n\n\n')
 
 
 # Transform the ast tree back to Python
