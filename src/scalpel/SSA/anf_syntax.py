@@ -350,7 +350,7 @@ def SA_PS(ps: [SSA_P], inner_term):
     if len(ps) == 1:
         first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
 
-        args = p.args
+        args = p.args[::-1]
         while len(args) > 0:
             first_term = ANF_V_FUNC(SA_V(args[0]), first_term)
             args = args[1:]
@@ -587,9 +587,13 @@ def parse_anf_to_ssa2(term):
                             max_idx = max(max_idx, idx)
                         phi_ass += [SSA_E_ASS_PHI(SSA_V_VAR(var + '_' + str(max_idx+1)), [SSA_V_VAR(arg) for arg in block_phi_assignment_vars[name][var]])]
                 return [], [SSA_B(SSA_L(term.var.name[1:]), phi_ass + stmts1 + stmts2, False)] + blocks1 + blocks2, procs1 + procs2
-        stmts1, blocks1, procs1 = parse_anf_to_ssa2(term.term1)
+
+        # Get all functions with 1 parameter at the start of the letrec describing the procs input variables
+        vars = get_function_parameter_recursive(term.term1)
+        next_non_func_term = get_next_non_function_term(term.term1)
+        stmts1, blocks1, procs1 = parse_anf_to_ssa2(next_non_func_term)
         stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
-        return [], [], [SSA_P(SSA_L(term.var.print(0, None)), [], blocks1 + blocks2)] + procs1 + procs2
+        return [], blocks2, [SSA_P(SSA_L(term.var.print(0, None)), [SSA_V_VAR(var) for var in vars], blocks1)] + procs1 + procs2
     elif isinstance(term, ANF_E_LET):
         name = term.var.print()
         # Parse the right assignment side first and check if the left side is a buffer variable

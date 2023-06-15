@@ -15,12 +15,13 @@ from src.scalpel.SSA.ssa_syntax import PY_to_SSA_AST
 # Testing code strings ######
 # ###########################
 
-code_str = """
-def aaa():
+func_test = """
+def aaa(x, y):
     print('123')
+    print(x + y)
 
 b = 10
-aaa()
+aaa(2, 4)
 
 """
 
@@ -192,7 +193,7 @@ ssa_file = 'ssa_parsed.txt'
 anf_file = 'anf_parsed.txt'
 anf_with_prov_file = 'anf_parsed_with_prov_info.txt'
 
-default_code_to_transform = if_else_test  # Change this value to transform another code
+default_code_to_transform = func_test  # Change this value to transform another code
 
 python_code_path = None
 debug_mode = True
