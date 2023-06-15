@@ -1,7 +1,10 @@
 import os
 import sys
+import re
 
-content_root = os.path.abspath(__file__).split('\examples\py_anf_transformer.py')[0]
+print('Absolute path: ', os.path.abspath(__file__))
+content_root = re.split(r'(\\|/)*examples(\\|/)*py_anf_transformer', os.path.abspath(__file__))[0]
+# content_root = os.path.abspath(__file__).split('\examples\py_anf_transformer.py')[0]
 if content_root not in sys.path:
     sys.path.append(content_root)
 
