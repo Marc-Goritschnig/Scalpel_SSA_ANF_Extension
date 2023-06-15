@@ -704,3 +704,100 @@ def PS_B_REF(prov_info, curr_block):
     block_refs[curr_block] = SSA_L(str(curr_block.id))
     return block_refs[curr_block]
 
+
+#################################################################################################################################
+##### Parsing SSA back to Python ################################################################################################
+#################################################################################################################################
+
+# Custom simple CFG representation
+class SimpleCFG:
+    def __init__(self, name, func_cfgs, entry_block):
+        self.name = name
+        self.func_cfgs = func_cfgs
+        self.entry_block = entry_block
+
+class SimpleCFGBlock:
+    def __init__(self, name, exits, ssa_terms):
+        self.name = name
+        self.exits = exits
+        self.ssa_terms = ssa_terms
+
+
+mapping_label_to_block = {}
+def get_simple_cfg_from_ssa(ssa_ast: SSA_AST):
+    func_cfgs: [SimpleCFG] = []
+    entry_block = None
+
+    for proc in ssa_ast.procs:
+        func_cfgs += get_simple_cfg_from_ssa_proc(proc)
+    first = True
+    for b in ssa_ast.blocks:
+        cfg_block = SimpleCFGBlock(b.label.label, get_exits_from_ssa_block(b), b.terms)
+        mapping_label_to_block[b.label.label] = cfg_block
+        if first:
+            first = False
+            entry_block = cfg_block
+
+    for (l, b) in mapping_label_to_block.items():
+        for idx, e in enumerate(b.exits):
+            b.exits[idx] = mapping_label_to_block[b.exits[idx]]
+    return SimpleCFG('', func_cfgs, entry_block)
+
+
+def get_simple_cfg_from_ssa_proc(proc: SSA_P):
+    func_cfgs: [SimpleCFG] = []
+    entry_block = None
+
+    first = True
+    for b in proc.blocks:
+        cfg_block = SimpleCFGBlock(b.label.label, get_exits_from_ssa_block(b), b.terms)
+        mapping_label_to_block[b.label.label] = cfg_block
+        if first:
+            first = False
+            entry_block = cfg_block
+
+    return [SimpleCFG(proc.name, func_cfgs, entry_block)]
+
+
+def get_exits_from_ssa_block(block: SSA_B):
+    exits = []
+    mapping_label_to_block[block.label.label] = block
+    for term in block.terms:
+        if isinstance(term, SSA_E_GOTO):
+            exits.append(term.label.label)
+        else:
+            exits += recursive_find_exits(term)
+    return exits
+
+
+def recursive_find_exits(cl):
+    exits = []
+    if hasattr(cl, '__dict__'):
+        names = filter(lambda a: not a.startswith('__'), dir(cl))
+        dict_of_class = vars(cl)
+        for (name, value) in dict_of_class.items():
+            if isinstance(value, SSA_E_GOTO):
+                exits.append(value.label.label)
+            else:
+                exits += recursive_find_exits(value)
+    return exits
+
+def parse_ssa_to_python(ssa_ast: SSA_AST):
+    cfg_simple = get_simple_cfg_from_ssa(ssa_ast)
+
+    blocks_visited = set()
+    next_exits = [cfg_simple.entry_block]
+    while len(next_exits) > 0:
+        exits = next_exits
+        next_exits = []
+        for block in exits:
+            if block not in blocks_visited:
+                blocks_visited.add(block)
+                next_exits += block.exits
+                for term in block.ssa_terms:
+                    print(term.print(0))
+
+block_phi_assignment_vars = {}
+buffer_assignments_ssa_py = {}
+def parse_ssa_to_anf2(term):
+    pass

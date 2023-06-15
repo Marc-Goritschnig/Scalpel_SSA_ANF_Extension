@@ -636,6 +636,7 @@ def parse_anf_to_ssa2(term):
     elif isinstance(term, ANF_V_UNIT):
         return [], [], []
 
+
 def get_name_from_buffer(name):
     if name in buffer_assignments_anf_ssa:
         return buffer_assignments_anf_ssa[name].print(0)
