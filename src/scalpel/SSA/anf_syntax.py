@@ -575,6 +575,15 @@ def parse_anf_to_ssa2(term):
             if re.match(block_label_regex, name):
                 stmts1, blocks1, procs1 = parse_anf_to_ssa2(term.term1.term)
                 stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
+
+                # Replace single constants which are return values with a SSA RET object
+                for idx, st in enumerate(stmts1):
+                    if isinstance(st, SSA_V_CONST):
+                        stmts1[idx] = SSA_E_RET(st)
+                for idx, st in enumerate(stmts1):
+                    if isinstance(st, SSA_V_CONST):
+                        stmts1[idx] = SSA_E_RET(st)
+
                 # The first innermost letrec got a simple function call in its "in" term which is artificially added from SSA to ANF to call the first Block and therefore not needed
                 if isinstance(term.term2, ANF_E_APP):
                     if re.match(block_label_regex, term.term2.name.name):
@@ -594,6 +603,15 @@ def parse_anf_to_ssa2(term):
         next_non_func_term = get_next_non_function_term(term.term1)
         stmts1, blocks1, procs1 = parse_anf_to_ssa2(next_non_func_term)
         stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
+
+        # Replace single constants which are return values with a SSA RET object
+        for idx, st in enumerate(stmts1):
+            if isinstance(st, SSA_V_CONST):
+                stmts1[idx] = SSA_E_RET(st)
+        for idx, st in enumerate(stmts1):
+            if isinstance(st, SSA_V_CONST):
+                stmts1[idx] = SSA_E_RET(st)
+
         return [], blocks2, [SSA_P(SSA_L(term.var.print(0, None)), [SSA_V_VAR(var) for var in vars], blocks1)] + procs1 + procs2
     elif isinstance(term, ANF_E_LET):
         name = term.var.print()
