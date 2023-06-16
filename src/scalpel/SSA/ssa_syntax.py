@@ -519,8 +519,9 @@ def PS_B(prov_info, block, first_in_proc):
         if block in addon_statements_per_block:
             stmts += addon_statements_per_block[block]
 
+        already_used_exits = find_exits(stmts)
         # If there is only one exit add a goto otherwise the exits will be handled in the node itself (like if-block)
-        if len(block.exits) == 1:
+        if len(block.exits) > len(already_used_exits):
             stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
 
         # Create a new SSA Block
@@ -760,9 +761,14 @@ def get_simple_cfg_from_ssa_proc(proc: SSA_P):
 
 
 def get_exits_from_ssa_block(block: SSA_B):
-    exits = []
     mapping_label_to_block[block.label.label] = block
-    for term in block.terms:
+    exits = find_exits(block.terms)
+    return exits
+
+
+def find_exits(terms):
+    exits = []
+    for term in terms:
         if isinstance(term, SSA_E_GOTO):
             exits.append(term.label.label)
         else:

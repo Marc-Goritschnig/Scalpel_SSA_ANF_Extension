@@ -161,7 +161,7 @@ class ANF_E_LETREC(ANF_E):
         #    i_var = ass_i.var.parse_anf_to_python(assignments, 0)
         #    return 'for ' + i_var + ' in ' + iter
 
-        if re.match(r'L([0-9]|_)*', self.var.name):
+        if re.match(block_label_regex, self.var.name):
             assignments[self.var.name] = self.term1.term
             return self.term2.parse_anf_to_python(assignments, lvl)
 
@@ -564,6 +564,7 @@ def parse_anf_to_ssa(anf_ast):
     return SSA_AST(procs, blocks)
 
 
+block_label_regex = r'^L([0-9]|_)*$'
 block_phi_assignment_vars = {}
 buffer_assignments_anf_ssa = {}
 def parse_anf_to_ssa2(term):
@@ -571,12 +572,12 @@ def parse_anf_to_ssa2(term):
     if isinstance(term, ANF_E_LETREC):
         if isinstance(term.var, ANF_V_VAR):
             name = term.var.name
-            if re.match(r'L([0-9]|_)*', name):
+            if re.match(block_label_regex, name):
                 stmts1, blocks1, procs1 = parse_anf_to_ssa2(term.term1.term)
                 stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
                 # The first innermost letrec got a simple function call in its "in" term which is artificially added from SSA to ANF to call the first Block and therefore not needed
                 if isinstance(term.term2, ANF_E_APP):
-                    if re.match(r'L([0-9]|_)*', term.term2.name.name):
+                    if re.match(block_label_regex, term.term2.name.name):
                         stmts2, blocks2, procs2 = [], [], []
                 phi_ass = []
                 if name in block_phi_assignment_vars:
@@ -610,7 +611,7 @@ def parse_anf_to_ssa2(term):
         return ass + stmts2, blocks2, procs2
     elif isinstance(term, ANF_E_APP):
         name = term.name.print()
-        if re.match(r'L([0-9]|_)*', name):
+        if re.match(block_label_regex, name):
             if name not in block_phi_assignment_vars:
                 block_phi_assignment_vars[name] = {}
             for arg in term.params:
@@ -624,7 +625,9 @@ def parse_anf_to_ssa2(term):
     elif isinstance(term, ANF_E_IF):
         stmts1, _, _ = parse_anf_to_ssa2(term.term_if)
         stmts2, _, _ = parse_anf_to_ssa2(term.term_else)
-        return [SSA_E_IF_ELSE(parse_anf_to_ssa2(term.test)[0][0], stmts1[0], stmts2[0])], [], []
+        stmts1 = stmts1[0] if len(stmts1) > 0 else SSA_E_RET(None)
+        stmts2 = stmts2[0] if len(stmts2) > 0 else SSA_E_RET(None)
+        return [SSA_E_IF_ELSE(parse_anf_to_ssa2(term.test)[0][0], stmts1, stmts2)], [], []
     elif isinstance(term, ANF_V_VAR):
         if term.name in buffer_assignments_anf_ssa:
             return [buffer_assignments_anf_ssa[term.name]], [], []
