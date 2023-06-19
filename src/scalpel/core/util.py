@@ -4,8 +4,6 @@ import pkgutil
 import sys
 from _ast import *
 
-import astor
-
 
 def iter_fields(node):
     """

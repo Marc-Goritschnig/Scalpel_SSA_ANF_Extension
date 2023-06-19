@@ -2,14 +2,15 @@ import os
 import sys
 import re
 
-print('Absolute path: ', os.path.abspath(__file__))
-content_root = re.split(r'(\\|/)*examples(\\|/)*py_anf_transformer', os.path.abspath(__file__))[0]
-# content_root = os.path.abspath(__file__).split('\examples\py_anf_transformer.py')[0]
-if content_root not in sys.path:
-    sys.path.append(content_root)
+#print('Absolute path: ', os.path.abspath(__file__))
+#content_root = re.split(r'(\\|/)*scalpel(\\|/)*ANF(\\|/)*py_anf_transformer', os.path.abspath(__file__))[0]
+#content_root = os.path.abspath(__file__).split('\examples\py_anf_transformer.py')[0]
+#if content_root not in sys.path:
+#    sys.path.append(content_root)
 
-from src.scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info, parse_anf_to_ssa
-from src.scalpel.SSA.ssa_syntax import PY_to_SSA_AST, parse_ssa_to_python
+from scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info, parse_anf_to_ssa
+from scalpel.SSA.ssa_syntax import PY_to_SSA_AST, parse_ssa_to_python
+
 
 # ###########################
 # Testing code strings ######
@@ -166,6 +167,11 @@ x = [1,2,3,4,5]
 y = [i + y for i in x for y in x]
 print(y)
 """
+list_comp_test_simple = """
+x = [1,2,3,4,5]
+y = [i + 2 for i in x]
+print(y)
+"""
 list_comp_test2 = """
 x = [1,2,3,4,5]
 _buffer_py_0 = []
@@ -187,18 +193,23 @@ def a():
 a()
 """
 
+fun_without_after = """
+for i in [1,2]:
+    print('1')
+"""
+
 output_folder = 'output'
 
 ssa_file = 'ssa_parsed.txt'
 anf_file = 'anf_parsed.txt'
 anf_with_prov_file = 'anf_parsed_with_prov_info.txt'
 
-default_code_to_transform = if_else_test  # Change this value to transform another code
+default_code_to_transform = while_test   # Change this value to transform another code
 
 python_code_path = None
 debug_mode = True
 print_CFG_graph = False
-parse_back = False
+parse_back = True
 
 
 def transform():
@@ -257,17 +268,19 @@ def transform():
             print('\n\n\n')
 
         # Parsing the anf code back to Python
-        anf_to_python = parsed.parse_anf_to_python({})
+        #anf_to_python = parsed.parse_anf_to_python({})
         if debug_mode:
-            print('Parsed Python code from ANF to Python test printed:')
-            print(anf_to_python)
+            #print('Parsed Python code from ANF to Python test printed:')
+            #print(anf_to_python)
             print('\n\n\n')
             print('Parsed Python code from ANF to SSA test printed:')
             print(parse_anf_to_ssa(parsed).print())
-            parse_ssa_to_python(parse_anf_to_ssa(parsed))
+            #parse_ssa_to_python(parse_anf_to_ssa(parsed))
             print('\n\n\n')
             print('\n\n\n')
 
+        print('Press any key to exit...')
+        #input()
 
 # Transform the ast tree back to Python
     # TODO: Implementation of back transformation

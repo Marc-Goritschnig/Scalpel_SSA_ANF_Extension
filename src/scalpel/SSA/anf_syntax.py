@@ -1,5 +1,5 @@
 from __future__ import annotations
-from src.scalpel.SSA.ssa_syntax import *
+from scalpel.SSA.ssa_syntax import *
 
 import re
 

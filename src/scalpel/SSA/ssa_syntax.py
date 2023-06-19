@@ -2,8 +2,8 @@ from __future__ import annotations
 import ast
 import re
 
-from src.scalpel.core.mnode import MNode
-from src.scalpel.SSA.const import SSA
+from scalpel.core.mnode import MNode
+from scalpel.SSA.const import SSA
 
 debug_mode = True
 font = {'assign': '←',
