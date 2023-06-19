@@ -9,7 +9,7 @@ import token
 import tokenize
 
 import astor
-import graphviz as gv
+#import graphviz as gv
 
 __all__ = ["Block", "Link", "CFG"]
 
@@ -326,11 +326,12 @@ class CFG(object):
             graph.edge(str(block.id), str(exit.target.id), label=edgelabel)
 
     def _build_visual(self, format="pdf", calls=True):
-        graph = gv.Digraph(
-            name="cluster" + self.name, format=format, graph_attr={"label": self.name}
-        )
-        self._visit_blocks(graph, self.entryblock, visited=[], calls=False)
-        return graph
+        #graph = gv.Digraph(
+        #    name="cluster" + self.name, format=format, graph_attr={"label": self.name}
+        #)
+        #self._visit_blocks(graph, self.entryblock, visited=[], calls=False)
+        #return graph
+        return None
 
     def build_visual(self, format, calls=True, show=True):
         """
