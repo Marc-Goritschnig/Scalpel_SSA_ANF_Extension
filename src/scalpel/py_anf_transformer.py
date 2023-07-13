@@ -52,9 +52,10 @@ def transform():
     anf_ast.enable_print_ascii()
     if debug_mode:
         print("Transformed AST tree printed:")
-        print(anf_ast.print(0))
-        print('\n\n\n')
 
+    print(anf_ast.print(0))
+    if debug_mode:
+        print('\n\n\n')
         print("Transformed AST tree with provenance printed:")
         print(print_anf_with_prov_info(anf_ast))
         print('\n\n\n')
@@ -104,7 +105,7 @@ if __name__ == '__main__':
     parser.add_argument("--ssa_out_name", '--ssa', default='ssa_parsed.txt', type=str, help="The filename for the generated SSA code")
     parser.add_argument("--anf_out_name", '--anf', default='anf_parsed.txt', type=str, help="The filename for the generated ANF code")
     parser.add_argument("--anf_with_prov_out_name", '-anf_plus', default='anf_parsed_with_prov_info.txt', type=str, help="The filename for the generated ANF code including provenance information")
-    parser.add_argument("--debug_mode", '-d', default=True, type=bool, help="Shows more information and logs when True")
+    parser.add_argument("--debug_mode", '-d', default=False, type=bool, help="Shows more information and logs when True")
     parser.add_argument("--save_cfg", '--cfg', default=False, type=bool, help="Saves the generated CFG in DOT format")
     parser.add_argument("--parse_back", '--back', default=False, type=bool, help="When True the transformation back will be done")
 
