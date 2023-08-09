@@ -3,8 +3,15 @@ import sys
 import re
 import argparse
 
+print('Absolute path: ', os.path.abspath(__file__))
+content_root = re.split(r'(\\|/)*scalpel', os.path.abspath(__file__))[0]
+print(content_root)
+if content_root not in sys.path:
+    sys.path.append(content_root)
+
 from scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info, parse_anf_to_ssa
 from scalpel.SSA.ssa_syntax import PY_to_SSA_AST, parse_ssa_to_python
+
 
 output_folder = 'output'
 
