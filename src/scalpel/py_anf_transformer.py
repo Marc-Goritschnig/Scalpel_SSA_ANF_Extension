@@ -103,6 +103,21 @@ def transform():
     # TODO: SSA - ?? NamedExpr, SetComp, DictComp, GeneratorExp
     # TODO: LATEX format prints
 
+def test_link(path: str):
+    global python_code_path, debug_mode
+    python_code_path = path
+    debug_mode = False
+    transform()
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 if __name__ == '__main__':
 
@@ -112,9 +127,9 @@ if __name__ == '__main__':
     parser.add_argument("--ssa_out_name", '--ssa', default='ssa_parsed.txt', type=str, help="The filename for the generated SSA code")
     parser.add_argument("--anf_out_name", '--anf', default='anf_parsed.txt', type=str, help="The filename for the generated ANF code")
     parser.add_argument("--anf_with_prov_out_name", '-anf_plus', default='anf_parsed_with_prov_info.txt', type=str, help="The filename for the generated ANF code including provenance information")
-    parser.add_argument("--debug_mode", '-d', default=False, type=bool, help="Shows more information and logs when True")
-    parser.add_argument("--save_cfg", '--cfg', default=False, type=bool, help="Saves the generated CFG in DOT format")
-    parser.add_argument("--parse_back", '--back', default=False, type=bool, help="When True the transformation back will be done")
+    parser.add_argument("--debug_mode", '-d', default=False, type=str2bool, help="Shows more information and logs when True")
+    parser.add_argument("--save_cfg", '--cfg', default=False, type=str2bool, help="Saves the generated CFG in DOT format")
+    parser.add_argument("--parse_back", '--back', default=False, type=str2bool, help="When True the transformation back will be done")
 
     args = parser.parse_args()
 
@@ -123,10 +138,12 @@ if __name__ == '__main__':
     anf_file = args.anf_out_name
     anf_with_prov_file = args.anf_with_prov_out_name
     python_code_path = args.input_path
-    debug_mode = args.debug_mode
-    print_CFG_graph = args.save_cfg
-    parse_back = args.parse_back
+    debug_mode = str2bool(args.debug_mode)
+    print_CFG_graph = str2bool(args.save_cfg)
+    parse_back = str2bool(args.parse_back)
 
+    print(debug_mode)
+    print(args.debug_mode)
     if print_CFG_graph:
         from staticfg import CFGBuilder
         graphviz_path = 'C:/Program Files/Graphviz/bin'

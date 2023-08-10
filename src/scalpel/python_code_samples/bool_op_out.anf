@@ -1,0 +1,14 @@
+letrec L1 = lambda  . 
+    let _buffer_2 = _Or a b in 
+        let _buffer_1 = _Or _buffer_2 c in 
+            let _buffer_0 = _Or _buffer_1 d in 
+                if _buffer_0 then 
+                    L2  
+                else
+                    unit
+in
+    letrec L2 = lambda  . 
+        let _ = print 'asdf' in 
+            unit
+    in
+        L1
