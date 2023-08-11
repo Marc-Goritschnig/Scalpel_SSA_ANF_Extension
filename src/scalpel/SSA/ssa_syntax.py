@@ -9,6 +9,31 @@ debug_mode = True
 font = {'assign': '←',
         'phi': 'φ'}
 
+operator_map = {
+    ast.Add: '+',
+    ast.Sub: '-',
+    ast.Mult: '*',
+    ast.MatMult: '+',
+    ast.Div: '/',
+    ast.Mod: '%',
+    ast.Pow: '**',
+    ast.LShift: '<',
+    ast.RShift: '>',
+    ast.BitOr: '|',
+    ast.BitXor: '^',
+    ast.BitAnd: '&',
+    ast.FloorDiv: '//',
+}
+
+
+
+
+
+
+
+
+
+
 
 class SSANode:
     def __init__(self):
@@ -378,6 +403,7 @@ def preprocess_py_code(code):
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
+                break
             elif isinstance(node, ast.ListComp):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
@@ -392,6 +418,14 @@ def preprocess_py_code(code):
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '.append(' + ast.unparse(node.elt) + ')')
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.AugAssign):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                new_code = ast.unparse(node.target) + ' = ' + ast.unparse(node.target) + ' ' + operator_map[type(node.op)] + ' ' + ast.unparse(node.value)
+                lines[node.lineno - 1] = line[:node.col_offset] + new_code + line[node.end_col_offset:]
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -601,6 +635,8 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         return [PS_E(prov_info, curr_block, stmt.value, st_nr, True)]
     elif isinstance(stmt, ast.Return):
         return [SSA_E_RET(PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
+    elif isinstance(stmt, ast.Delete):
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Delete_' + str(len(stmt.targets))), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.targets])]
     elif isinstance(stmt, ast.For):
         # Handled separately
         return []
@@ -608,7 +644,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         args = [PS_E(prov_info, curr_block, stmt.test, st_nr, False)]
         if stmt.msg is not None:
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('Assert'), args)]
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Assert'), args)]
     if debug_mode:
         print("Nothing matched for statement: ", stmt)
     return []

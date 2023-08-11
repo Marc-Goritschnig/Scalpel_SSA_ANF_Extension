@@ -142,8 +142,6 @@ if __name__ == '__main__':
     print_CFG_graph = str2bool(args.save_cfg)
     parse_back = str2bool(args.parse_back)
 
-    print(debug_mode)
-    print(args.debug_mode)
     if print_CFG_graph:
         from staticfg import CFGBuilder
         graphviz_path = 'C:/Program Files/Graphviz/bin'
