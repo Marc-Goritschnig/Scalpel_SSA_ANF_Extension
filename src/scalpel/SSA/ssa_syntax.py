@@ -55,6 +55,7 @@ class SSANode:
 
 class SSA_V(SSANode):
     def __init__(self):
+        self.type = None
         super().__init__()
 
     def print(self, lvl):
@@ -640,11 +641,26 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
     elif isinstance(stmt, ast.For):
         # Handled separately
         return []
+    elif isinstance(stmt, ast.AnnAssign):
+        variable = PS_E(prov_info, curr_block, stmt.target, st_nr, False)
+        variable.type = stmt.annotation.id
+        # TODO a.b:int = 10 (class variable)
+        return [SSA_E_ASS(variable, PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
+    elif isinstance(stmt, ast.Raise):
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Raise_' + str(1 + len(stmt.exc.args))), [PS_E(prov_info, curr_block, stmt.exc.func, st_nr, False)] + [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])]
     elif isinstance(stmt, ast.Assert):
         args = [PS_E(prov_info, curr_block, stmt.test, st_nr, False)]
+        name = '_Assert'
         if stmt.msg is not None:
+            name = '_Assert_2'
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Assert'), args)]
+        return [SSA_V_FUNC_CALL(SSA_V_VAR(name), args)]
+    elif isinstance(stmt, ast.Pass):
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('Pass'), [])]
+    elif isinstance(stmt, ast.Break):
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('Break'), [])]
+    elif isinstance(stmt, ast.Continue):
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('Continue'), [])]
     if debug_mode:
         print("Nothing matched for statement: ", stmt)
     return []
