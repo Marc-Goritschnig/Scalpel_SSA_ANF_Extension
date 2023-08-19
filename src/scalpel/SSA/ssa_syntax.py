@@ -425,8 +425,24 @@ def preprocess_py_code(code):
             elif isinstance(node, ast.AugAssign):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
+
                 new_code = ast.unparse(node.target) + ' = ' + ast.unparse(node.target) + ' ' + operator_map[type(node.op)] + ' ' + ast.unparse(node.value)
                 lines[node.lineno - 1] = line[:node.col_offset] + new_code + line[node.end_col_offset:]
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.IfExp):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                buffer_var = get_buffer_var()
+                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_code = indentation * ' ' + 'if ' + ast.unparse(node.test) + ':\n' \
+                           + indentation * ' ' + '\t' + buffer_var + ' = ' + ast.unparse(node.body) \
+                           + indentation * ' ' + '\nelse:\n' \
+                           + indentation * ' ' + '\t' + buffer_var + ' = '+ ast.unparse(node.orelse)
+                lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True
                 break

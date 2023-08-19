@@ -3,6 +3,8 @@ import sys
 import re
 import argparse
 
+from functions import trim_double_spaces
+
 print('Absolute path: ', os.path.abspath(__file__))
 content_root = re.split(r'(\\|/)*scalpel', os.path.abspath(__file__))[0]
 print(content_root)
@@ -25,7 +27,6 @@ python_code_path = None
 debug_mode = True
 print_CFG_graph = False
 parse_back = False
-
 
 def transform():
     # Print cfg into file
@@ -51,7 +52,7 @@ def transform():
     ssa_ast.enable_print_ascii()
     if debug_mode:
         print("Transformed SSA tree printed:")
-        print(ssa_ast.print(0))
+        print(trim_double_spaces(ssa_ast.print(0)))
         print('\n\n\n')
 
     # Create an ANF AST from SSA AST
@@ -60,11 +61,11 @@ def transform():
     if debug_mode:
         print("Transformed AST tree printed:")
 
-    print(anf_ast.print(0))
+    print(trim_double_spaces(anf_ast.print(0)))
     if debug_mode:
         print('\n\n\n')
         print("Transformed AST tree with provenance printed:")
-        print(print_anf_with_prov_info(anf_ast))
+        print(trim_double_spaces(print_anf_with_prov_info(anf_ast)))
         print('\n\n\n')
 
     # Print parsed SSA and ANF code to output files
@@ -148,3 +149,6 @@ if __name__ == '__main__':
         os.environ["PATH"] += os.pathsep + graphviz_path
 
     transform()
+
+# TODO Talk about:
+# TODO ast.Attrobute - class function calls like obj.getMap() => cl_fun_[#args](obj, getMap, args...)
