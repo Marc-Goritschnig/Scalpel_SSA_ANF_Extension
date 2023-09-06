@@ -329,7 +329,7 @@ const_dict = {}
 used_var_names = {}
 
 # Prefix for new variables from the transformation
-buffer_var_name = "_ssa_buffer_"
+buffer_var_name = "_ssa_"
 buffer_counter = 0  # Index for new buffer variables (postfix)
 
 # Mapping dict of nodes to their new buffer variable name to be replaced with when occurring in the translation
@@ -750,8 +750,20 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             return SSA_V_VAR(name + '_' + str(ssa_results_stored[curr_block.id][st_nr][name]))
         return SSA_V_VAR(name)
     elif isinstance(stmt, ast.JoinedStr):
-        # TODO what to use
-        return SSA_V_CONST("Formatted_Print")
+        parts = []
+        for part in stmt.values:
+            if isinstance(part, ast.Constant):
+                parts.append(PS_E(prov_info, curr_block, part, st_nr, is_load))
+            elif isinstance(part, ast.FormattedValue):
+                if hasattr(part, 'format_spec') and part.format_spec is not None:
+                    parts.append(SSA_V_FUNC_CALL(SSA_L('_str_format3'), [PS_E(prov_info, curr_block, part.value, st_nr, is_load), SSA_V_CONST(part.conversion), PS_E(prov_info, curr_block, part.format_spec, st_nr, is_load)]))
+                else:
+                    parts.append(SSA_V_FUNC_CALL(SSA_L('_str_format2'), [PS_E(prov_info, curr_block, part.value, st_nr, is_load), SSA_V_CONST(part.conversion)]))
+        #parts.reverse()
+        out = parts[0]
+        for part in parts[1:]:
+            out = SSA_V_FUNC_CALL(SSA_L('_ADD'), [out, part])
+        return out
 
     if debug_mode:
         print("No match found for statement: ", stmt)
