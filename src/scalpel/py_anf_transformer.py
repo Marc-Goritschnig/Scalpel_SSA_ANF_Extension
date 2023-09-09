@@ -3,7 +3,7 @@ import sys
 import re
 import argparse
 
-from functions import trim_double_spaces
+from .functions import trim_double_spaces
 
 print('Absolute path: ', os.path.abspath(__file__))
 content_root = re.split(r'(\\|/)*scalpel', os.path.abspath(__file__))[0]
@@ -98,8 +98,8 @@ def transform():
             print('\n\n\n')
             print('\n\n\n')
 
-        print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
-
+        # print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
+        print(anf_to_python, end='')
 
 # Transform the ast tree back to Python
     # TODO: Implementation of back transformation

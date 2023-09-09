@@ -143,7 +143,8 @@ class ANF_E_LET(ANF_E):
             assignments[name] = self.term1
             return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
-        return get_indentation(lvl) + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + ' = ' + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        out = get_indentation(lvl) + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + ' = ' + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        return "\n".join([s for s in out.split("\n") if s])
 
 class ANF_E_LETREC(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E):
