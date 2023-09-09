@@ -61,7 +61,9 @@ def transform():
     if debug_mode:
         print("Transformed AST tree printed:")
 
-    print(trim_double_spaces(anf_ast.print(0)))
+    if not parse_back:
+        print(trim_double_spaces(anf_ast.print(0)))
+
     if debug_mode:
         print('\n\n\n')
         print("Transformed AST tree with provenance printed:")
@@ -85,16 +87,18 @@ def transform():
             print('\n\n\n')
 
         # Parsing the anf code back to Python
-        anf_to_python = parsed.parse_anf_to_python({})
+        anf_to_python = parsed.parse_anf_to_python({}, [], [])
         if debug_mode:
             print('Parsed Python code from ANF to Python test printed:')
             print(anf_to_python)
             print('\n\n\n')
             print('Parsed Python code from ANF to SSA test printed:')
             print(parse_anf_to_ssa(parsed).print())
-            parse_ssa_to_python(parse_anf_to_ssa(parsed))
+            print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
             print('\n\n\n')
             print('\n\n\n')
+
+        print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
 
 
 # Transform the ast tree back to Python
@@ -104,10 +108,11 @@ def transform():
     # TODO: SSA - ?? NamedExpr, SetComp, DictComp, GeneratorExp
     # TODO: LATEX format prints
 
-def test_link(path: str):
-    global python_code_path, debug_mode
+def test_link(path: str, back: bool):
+    global python_code_path, debug_mode, parse_back
     python_code_path = path
     debug_mode = False
+    parse_back = back
     transform()
 
 def str2bool(v):

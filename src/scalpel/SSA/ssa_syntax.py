@@ -42,6 +42,9 @@ class SSANode:
     def print(self, lvl):
         return 'not implemented'
 
+    def parse_to_python(self, lvl):
+        return 'not implemented'
+
     def enable_print_ascii(self):
         global font
         font = {'assign': '<-',
@@ -64,6 +67,9 @@ class SSA_V(SSANode):
     def print_latex(self, lvl):
         return ''
 
+    def parse_to_python(self, lvl):
+        return ''
+
 
 class SSA_L(SSA_V):
     def __init__(self, label: str):
@@ -75,6 +81,9 @@ class SSA_L(SSA_V):
 
     def print_latex(self, lvl):
         return ""
+
+    def parse_to_python(self, lvl):
+        return map_ssa_to_python(self.label)
 
 
 class SSA_V_CONST(SSA_V):
@@ -88,6 +97,8 @@ class SSA_V_CONST(SSA_V):
     def print_latex(self, lvl):
         return ""
 
+    def parse_to_python(self, lvl):
+        return map_ssa_to_python(self.value)
 
 class SSA_V_VAR(SSA_V):
     def __init__(self, name: str):
@@ -99,6 +110,9 @@ class SSA_V_VAR(SSA_V):
 
     def print_latex(self, lvl):
         return ""
+
+    def parse_to_python(self, lvl):
+        return map_ssa_to_python(self.name)
 
 
 class SSA_V_FUNC_CALL(SSA_V):
@@ -114,6 +128,10 @@ class SSA_V_FUNC_CALL(SSA_V):
         return ""
 
 
+    def parse_to_python(self, lvl):
+        return f"{self.name.parse_to_python(lvl) + print_args_to_python(self.args, lvl)}"
+
+
 class SSA_E(SSANode):
     def __init__(self):
         super().__init__()
@@ -122,6 +140,9 @@ class SSA_E(SSANode):
         return ""
 
     def print_latex(self, lvl):
+        return ""
+
+    def parse_to_python(self, lvl):
         return ""
 
 
@@ -137,6 +158,9 @@ class SSA_E_ASS_PHI(SSA_E):
     def print_latex(self, lvl):
         return ""
 
+    def parse_to_python(self, lvl):
+        return self.var.parse_to_python(lvl) + ' ' + font['assign'] + ' ' + font['phi'] + print_args_to_python(self.args, lvl)
+
 
 class SSA_E_ASS(SSA_E):
     def __init__(self, var: SSA_V, value: SSA_V):
@@ -150,6 +174,9 @@ class SSA_E_ASS(SSA_E):
     def print_latex(self, lvl):
         return ""
 
+    def parse_to_python(self, lvl):
+        return f"{self.var.parse_to_python(lvl)+ ' ' + font['assign'] + ' ' + self.value.parse_to_python(lvl)}"
+
 
 class SSA_E_GOTO(SSA_E):
     def __init__(self, label: SSA_L):
@@ -161,6 +188,9 @@ class SSA_E_GOTO(SSA_E):
 
     def print_latex(self, lvl):
         return ""
+
+    def parse_to_python(self, lvl):
+        return f"{'goto L' + self.label.parse_to_python(lvl)}"
 
 
 class SSA_E_RET(SSA_E):
@@ -175,6 +205,9 @@ class SSA_E_RET(SSA_E):
 
     def print_latex(self, lvl):
         return ""
+
+    def parse_to_python(self, lvl):
+        return 'return ' + map_ssa_to_python(self.name)
 
 
 class SSA_E_IF_ELSE(SSA_E):
@@ -191,6 +224,10 @@ class SSA_E_IF_ELSE(SSA_E):
     def print_latex(self, lvl):
         return ""
 
+    def parse_to_python(self, lvl):
+        new_line = '\n'
+        return f"{'if ' + self.test.parse_to_python(lvl) + ' then ' + self.term_if.parse_to_python(lvl) + new_line + get_indentation(lvl) + 'else ' + self.term_else.parse_to_python(lvl)}"
+
 
 class SSA_B(SSANode):
     def __init__(self, label: SSA_L, terms: [SSA_E], first_in_proc: bool):
@@ -201,13 +238,14 @@ class SSA_B(SSANode):
 
     def print(self, lvl):
         new_line = '\n'
-
-        #if self.first_in_proc:
-        #    return print_terms(self.terms, lvl)
         return get_indentation(lvl) + f"{'L' + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
 
     def print_latex(self, lvl):
         return ""
+
+    def parse_to_python(self, lvl):
+        new_line = '\n'
+        return get_indentation(lvl) + f"{'L' + self.label.parse_to_python(lvl+1) + ': ' + new_line + print_terms_to_python(self.terms, lvl+1)}"
 
 
 class SSA_P(SSANode):
@@ -224,6 +262,9 @@ class SSA_P(SSANode):
     def print_latex(self):
         return ""
 
+    def parse_to_python(self, lvl):
+        return 'proc ' + self.name.parse_to_python(0) + print_args_to_python(self.args, 0) + '\n{\n' + '\n\n'.join([b.parse_to_python(1) for b in self.blocks]) + '\n}\n'
+
 
 class SSA_AST(SSANode):
     def __init__(self, procs: [SSA_P], blocks: [SSA_B]):
@@ -237,6 +278,9 @@ class SSA_AST(SSANode):
     def print_latex(self, lvl=0):
         return ""
 
+    def parse_to_python(self, lvl):
+        return '\n'.join([p.parse_to_python() for p in self.procs]) + '\n\n'.join([b.parse_to_python(lvl) for b in self.blocks]) #  + '\n' + self.ret_term.print(0)
+
 
 def print_args(args: [SSANode], lvl):
     return '(' + ', '.join([arg.print(lvl) for arg in args]) + ')'
@@ -246,12 +290,21 @@ def print_args_latex(args: [SSANode], lvl):
     return ""
 
 
+def print_args_to_python(args: [SSANode], lvl):
+    return '(' + ', '.join([arg.parse_to_python(lvl) for arg in args]) + ')'
+
+
 def print_terms(terms: [SSANode], lvl):
     return ';\n'.join([(get_indentation(lvl) + term.print(lvl)) for term in terms if term is not None]) + ';'
 
 
 def print_terms_latex(terms: [SSANode], lvl):
     return ""
+
+
+def print_terms_to_python(terms: [SSANode], lvl):
+    return ';\n'.join([(get_indentation(lvl) + term.parse_to_python(lvl)) for term in terms if term is not None]) + ';'
+
 
 
 def get_indentation(nesting_lvl):
@@ -405,7 +458,25 @@ def preprocess_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
+            elif isinstance(node, ast.NamedExpr):
+                if not 'ssa' in node.target.id:
+                    lines = code.split('\n')
+                    line = lines[node.lineno - 1]
+                    buffer_var = get_buffer_var()
+                    if len(lines[node.lineno - 1]) == (node.end_col_offset - node.col_offset):
+                        lines[node.lineno - 1] = ''
+                    else:
+                        lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+
+                    new_lines = []
+                    indentation = len(re.findall(r"^ *", line)[0])
+                    new_lines.append(indentation * ' ' + '(' + buffer_var + ':=' + ast.unparse(node.value) + ')')
+                    lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                    code = '\n'.join(lines)
+                    replaced = True
+                break
             elif isinstance(node, ast.ListComp):
+                # TODO ifs not handled
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
                 buffer_var = get_buffer_var()
@@ -418,6 +489,40 @@ def preprocess_py_code(code):
                     new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '.append(' + ast.unparse(node.elt) + ')')
+                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.SetComp):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                buffer_var = get_buffer_var()
+                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+
+                new_lines = []
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_lines.append(indentation * ' ' + buffer_var + ' = {}')
+                for g in node.generators:
+                    new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
+                    indentation += 4
+                new_lines.append(indentation * ' ' + buffer_var + '.add(' + ast.unparse(node.elt) + ')')
+                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.DictComp):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                buffer_var = get_buffer_var()
+                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+
+                new_lines = []
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_lines.append(indentation * ' ' + buffer_var + ' = {}')
+                for g in node.generators:
+                    new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
+                    indentation += 4
+                new_lines.append(indentation * ' ' + buffer_var + '[' + ast.unparse(node.key) + '] = ' + ast.unparse(node.value))
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
@@ -672,11 +777,11 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
         return [SSA_V_FUNC_CALL(SSA_V_VAR(name), args)]
     elif isinstance(stmt, ast.Pass):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('Pass'), [])]
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Pass'), [])]
     elif isinstance(stmt, ast.Break):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('Break'), [])]
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Break'), [])]
     elif isinstance(stmt, ast.Continue):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('Continue'), [])]
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Continue'), [])]
     if debug_mode:
         print("Nothing matched for statement: ", stmt)
     return []
@@ -693,6 +798,9 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)])
             values = values[1:]
         return result
+    elif isinstance(stmt, ast.NamedExpr):
+        return SSA_E_ASS(PS_E(prov_info, curr_block, stmt.target, st_nr, False),
+                          PS_E(prov_info, curr_block, stmt.value, st_nr, True))
     elif isinstance(stmt, ast.ListComp):
         return buffer_assignments[stmt]
     elif isinstance(stmt, ast.UnaryOp):
@@ -712,13 +820,13 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     elif isinstance(stmt, ast.Slice):
         return SSA_V_CONST(stmt.value)
     elif isinstance(stmt, ast.Tuple):
-        return SSA_V_FUNC_CALL(SSA_V_VAR('new_tuple_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_tuple_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
     elif isinstance(stmt, ast.Dict):
-        return SSA_V_FUNC_CALL(SSA_V_VAR('new_dict_' + str(len(stmt.keys))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for args in zip(stmt.keys, stmt.values) for arg in args])
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_dict_' + str(len(stmt.keys))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for args in zip(stmt.keys, stmt.values) for arg in args])
     elif isinstance(stmt, ast.Set):
-        return SSA_V_FUNC_CALL(SSA_V_VAR('new_set_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_set_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
     elif isinstance(stmt, ast.List):
-        return SSA_V_FUNC_CALL(SSA_V_VAR('new_list_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_list_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
     elif isinstance(stmt, ast.Subscript):
         if isinstance(stmt.slice, ast.Slice):
             appendix = ""
@@ -730,9 +838,9 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
                 appendix += "S"
             if len(appendix) > 0:
                 appendix = "_" + appendix
-            return SSA_V_FUNC_CALL(SSA_V_VAR('List_Slice' + appendix), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]))
+            return SSA_V_FUNC_CALL(SSA_V_VAR('_List_Slice' + appendix), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]))
         else:
-            return SSA_V_FUNC_CALL(SSA_V_VAR('LSD_Get'), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + [PS_E(prov_info, curr_block, stmt.slice, st_nr, is_load)])
+            return SSA_V_FUNC_CALL(SSA_V_VAR('_LSD_Get'), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + [PS_E(prov_info, curr_block, stmt.slice, st_nr, is_load)])
     elif isinstance(stmt, ast.Attribute):
         return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.attr), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)])
     elif isinstance(stmt, ast.Name):
@@ -887,7 +995,30 @@ def parse_ssa_to_python(ssa_ast: SSA_AST):
     cfg_simple = get_simple_cfg_from_ssa(ssa_ast)
 
     blocks_visited = set()
+    #for proc in ssa_ast.procs:
+    #    print(proc.name.print(0) + '():')
+    #    for block in proc.blocks:
+    #        if block not in blocks_visited:
+    #            blocks_visited.add(block)
+    #            for term in block.terms:
+    #                print(term.print(1))
+    for cfg in cfg_simple.func_cfgs:
+        next_exits = [cfg.entry_block]
+        print(cfg.name.print(0) + '():')
+        parse_ssa_to_python_blocks(next_exits, blocks_visited, 1)
+
     next_exits = [cfg_simple.entry_block]
+    parse_ssa_to_python_blocks(next_exits, blocks_visited, 0)
+
+
+def map_ssa_to_python(param: str):
+    if param.startswith('_'):
+        param = param[1:]
+        if param in operator_map:
+            return operator_map[param]
+
+
+def parse_ssa_to_python_blocks(next_exits, blocks_visited, ind_lvl):
     while len(next_exits) > 0:
         exits = next_exits
         next_exits = []
@@ -896,7 +1027,7 @@ def parse_ssa_to_python(ssa_ast: SSA_AST):
                 blocks_visited.add(block)
                 next_exits += block.exits
                 for term in block.ssa_terms:
-                    print(term.print(0))
+                    print('\t' * ind_lvl + term.print(0))
 
 block_phi_assignment_vars = {}
 buffer_assignments_ssa_py = {}

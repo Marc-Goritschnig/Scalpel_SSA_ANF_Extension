@@ -6,6 +6,10 @@ import re
 font = {'lambda_sign': 'λ'}
 debug_mode = False
 
+block_call_pattern = re.compile(r'^L([0-9])+(.)*')
+function_mapping_ext = {
+    re.compile(r'^_new_list_([0-9])+$'): '[%s]'
+}
 function_mapping = {
     '_And': '%s and %s',
     '_Or': '%s or %s',
@@ -35,7 +39,8 @@ function_mapping = {
     '_Is': '%s is %s',
     '_IsNot': '%s is not %s',
     '_In': '%s in %s',
-    '_NotIn': '%s not in %s'
+    '_NotIn': '%s not in %s',
+    '_LSD_Get': '%s[%s]'
 }
 
 class ANFNode:
@@ -56,7 +61,7 @@ class ANFNode:
     def get_prov_info(self, prov_info):
         return ''
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return None
 
 
@@ -70,7 +75,7 @@ class ANF_EV(ANFNode):
     def get_prov_info(self, prov_info):
         return ''
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return None
 
 
@@ -84,7 +89,7 @@ class ANF_E(ANF_EV):
     def get_prov_info(self, prov_info):
         return ''
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return None
 
 class ANF_E_APP(ANF_E):
@@ -99,15 +104,23 @@ class ANF_E_APP(ANF_E):
     def get_prov_info(self, prov_info):
         return 'f' + self.name.get_prov_info(None) + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if isinstance(self.name, ANF_V_CONST):
             if re.match('L([0-9]|_)*', self.name.value):
-                if self.name.value in assignments:
-                    return assignments[self.name.value].parse_anf_to_python(assignments, lvl)
+                if self.name.value in assignments and self.name.value not in parsed_blocks:
+                    parsed_blocks.append(self.name.value)
+                    return assignments[self.name.value].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         if isinstance(self.name, ANF_V_VAR):
             if self.name.name in function_mapping:
-                return get_indentation(lvl) + (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, 0) for p in self.params]))
-        return get_indentation(lvl) + self.name.parse_anf_to_python(assignments) + '(' + ','.join([p.parse_anf_to_python(assignments, 0) for p in self.params]) + ')'
+                return get_indentation(lvl) + (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+            for (pattern, value) in function_mapping_ext.items():
+                if pattern.match(self.name.name):
+                    return get_indentation(lvl) + (value % ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+            if re.match('L([0-9]|_)*', self.name.name):
+                return get_indentation(lvl) + self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)
+
+        out = get_indentation(lvl) + self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]) + ')'
+        return out
 
 class ANF_E_LET(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E):
@@ -122,14 +135,15 @@ class ANF_E_LET(ANF_E):
     def get_prov_info(self, prov_info):
         return 'let;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + ';in\n' + self.term2.get_prov_info(None)
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         name = self.var.name
         if name == '_':
-            return get_indentation(lvl) + self.term1.parse_anf_to_python(assignments) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+            return get_indentation(lvl) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         elif name.startswith('_buffer_'):
             assignments[name] = self.term1
-            return self.term2.parse_anf_to_python(assignments, lvl)
-        return get_indentation(lvl) + self.var.parse_anf_to_python(assignments) + ' = ' + self.term1.parse_anf_to_python(assignments) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+            return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
+        return get_indentation(lvl) + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + ' = ' + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
 
 class ANF_E_LETREC(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E):
@@ -151,19 +165,19 @@ class ANF_E_LETREC(ANF_E):
         else:
             return 'letrec;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
 
         ## Check if was For loop
         #if self.var.name == 'L1': #  re.match('L[0-9]*]', self.var.name):
         #    ass_iter = self.term1
-        #    iter = ass_iter.term1.parse_anf_to_python(assignments, 0)
+        #    iter = ass_iter.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0)
         #    ass_i = self.term2
-        #    i_var = ass_i.var.parse_anf_to_python(assignments, 0)
+        #    i_var = ass_i.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0)
         #    return 'for ' + i_var + ' in ' + iter
 
         if re.match(block_label_regex, self.var.name):
             assignments[self.var.name] = self.term1.term
-            return self.term2.parse_anf_to_python(assignments, lvl)
+            return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
 
         if isinstance(self.var, ANF_V_VAR):
             if self.var.name.startswith(block_identifier) and isinstance(self.term2, ANF_E_APP):
@@ -171,13 +185,14 @@ class ANF_E_LETREC(ANF_E):
                     # L1 = XXX in L1
                     # Return just XXX and store XXX if still L1 is called somewhere else
                     assignments[self.var.name] = self.term2
-                    return self.term1.parse_anf_to_python(assignments, lvl, False)
+                    return self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl, False)
         elif isinstance(self.term2, ANF_V_FUNC):
-            return get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+            return get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
 
         vars = get_function_parameter_recursive(self.term1)
         next_term = get_next_non_function_term(self.term1)
-        return get_indentation(lvl) + 'def ' + self.var.print(0, None) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, lvl)
+        newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
+        return get_indentation(lvl) + 'def ' + self.var.print(0, None) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
 
 
 def get_function_parameter_recursive(next):
@@ -207,8 +222,48 @@ class ANF_E_IF(ANF_E):
     def get_prov_info(self, prov_info):
         return 'if;' + self.test.get_prov_info(None) + ';then\n' + self.term_if.get_prov_info(None) + '\nelse\n' + self.term_else.get_prov_info(None)
 
-    def parse_anf_to_python(self, assignments, lvl=0):
-        return get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, lvl) + ':\n' + self.term_if.parse_anf_to_python(assignments, lvl + 1) + '\nelse:\n' + self.term_if.parse_anf_to_python(assignments, lvl + 1) + '\n'
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
+        parsed_blocks_buffer = parsed_blocks.copy()
+
+        # First time parsing will generate the parse also the blocks within
+        if_out = (self.term_if.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1))
+        else_out = (self.term_else.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1))
+
+        # Second time parsing will only print the block label as function call
+        if_block_label = (self.term_if.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0))
+        else_block_label = (self.term_else.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0))
+
+        # Get the block label numbers
+        parsed_blocks = parsed_blocks_buffer
+        goto1 = if_block_label.split('\n')[-1].strip().split('(')[0][1:]
+        goto2 = else_block_label.split('\n')[-1].strip().split('(')[0][1:]
+
+        # If the labels of gotos are i and i+1 it shows as the pattern which is generated when parsing a while loop
+        # Otherwise it would be i and i+2 because the block i+1 would be after the if-else block
+        if int(goto1) + 1 == int(goto2):
+            if_out = '\n'.join(if_out.split('\n')[0:-1])
+            return (get_indentation(lvl) + 'while ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + ':\n'
+                    + if_out + '\n' + remove_indentation(else_out, 1) + '\n')
+
+        # Prevent that the block after if-else gets printed into then if part - then print it separately after both parts
+        # Add the block label from the one after the if-else block to the parse blocks - therefore it will not be parsed into the output
+        parsed_blocks.append('L' + str(int(goto1) + 1))
+        if_out = (self.term_if.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1))
+        else_out = (self.term_else.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1))
+
+        # Remove the block label function calls which are at the end of the parsed codes if the program does not stop there
+        # If so there would be no label and there should not be the last line removed
+        if_lines = if_out.split('\n')
+        else_lines = else_out.split('\n')
+        if block_call_pattern.match(if_lines[-1].strip()):
+            if_out = '\n'.join(if_lines[0:-1])
+        if block_call_pattern.match(else_lines[-1].strip()):
+            else_out = '\n'.join(else_lines[0:-1])
+        post_if_else = assignments['L' + str(int(goto1) + 1)].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) if 'L' + str(int(goto1) + 1) in assignments else ''
+
+        # If there is no content left in the else branch do not print any else content
+        else_out = '' if else_out == '' else ('\n' + get_indentation(lvl) + 'else:\n' + else_out + '\n' )
+        return get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) + ':\n' + if_out + else_out + post_if_else
 
 class ANF_V(ANF_EV):
     def __init__(self):
@@ -220,7 +275,7 @@ class ANF_V(ANF_EV):
     def get_prov_info(self, prov_info):
         return ''
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return get_indentation(lvl) + 'ANF_V'
 
 class ANF_V_CONST(ANF_V):
@@ -234,7 +289,7 @@ class ANF_V_CONST(ANF_V):
     def get_prov_info(self, prov_info):
         return 'c'
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return get_indentation(lvl) + self.value
 
 class ANF_V_VAR(ANF_V):
@@ -248,9 +303,9 @@ class ANF_V_VAR(ANF_V):
     def get_prov_info(self, prov_info):
         return 'v'
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if self.name in assignments:
-            return get_indentation(lvl) + assignments[self.name].parse_anf_to_python(assignments, lvl)
+            return get_indentation(lvl) + assignments[self.name].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         idx = self.name.rfind('_')
         if idx == -1:
             idx = len(self.name)
@@ -267,7 +322,7 @@ class ANF_V_UNIT(ANF_V):
     def get_prov_info(self, prov_info):
         return 'u'
 
-    def parse_anf_to_python(self, assignments, lvl=0):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return ''
 
 class ANF_V_FUNC(ANF_V):
@@ -294,19 +349,26 @@ class ANF_V_FUNC(ANF_V):
             return 'lambda;' + self.input_var.get_prov_info(None) + ';.;' + self.term.get_prov_info(None)
         return 'lambda;' + self.input_var.get_prov_info(None) + ';.\n' + self.term.get_prov_info(None)
 
-    def parse_anf_to_python(self, assignments, lvl=0, print_variables=True):
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0, print_variables=True):
         if not print_variables:
-            return self.term.parse_anf_to_python(assignments, lvl)
+            return self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         vars = get_function_parameter_recursive(self.term)
         next_term = get_next_non_function_term(self.term)
         if self.input_var is None:
-            return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, lvl)
-        vars += [self.input_var.parse_anf_to_python(assignments)]
-        return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, lvl)
+            return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        vars += [self.input_var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)]
+        return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
 
 
 def get_indentation(nesting_lvl):
     return '    ' * nesting_lvl
+
+
+def remove_indentation(code, i):
+    new_code = ''
+    for c in code.split('\n'):
+        new_code += c[4:] + '\n'
+    return new_code
 
 
 def parse_ssa_to_anf(ssa: SSA_AST, debug: bool):
