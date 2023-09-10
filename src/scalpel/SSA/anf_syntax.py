@@ -8,8 +8,11 @@ debug_mode = False
 
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
 function_mapping_ext = {
-    re.compile(r'^_new_list_([0-9])+$'): '[%s]'
+    re.compile(r'^_new_list_([0-9])+$'): '[%s]',
+    re.compile(r'^_Delete_([0-9])+$'): 'del %s'
+
 }
+ #_Raise_ _Assert _Pass _Break _Continue _new_tuple_ _new_dict_ _new_set_ _new_list_ _List_Slice(LUS) _LSD_Get _str_format3 _ADD
 function_mapping = {
     '_And': '%s and %s',
     '_Or': '%s or %s',
@@ -40,8 +43,38 @@ function_mapping = {
     '_IsNot': '%s is not %s',
     '_In': '%s in %s',
     '_NotIn': '%s not in %s',
-    '_LSD_Get': '%s[%s]'
+    '_LSD_Get': '%s[%s]',
+    '_Raise_1': 'raise %s',
+    '_Raise_2': 'raise %s from %s',
 }
+
+# Global reference of the SSA AST to be transformed
+ssa_ast_global: SSA_AST = None
+
+# Prefix of block labels from SSA
+block_identifier = 'L'
+
+# Buffer variables mapped to ANF nodes to replace more complex code due to only values being allowed to be used in function calls
+buffer_assignments = {}
+buffer_variable_counter = 0
+
+# Keywords to be ignored when parsing ANF code due to special handling
+keywords = ['let', 'letrec', 'lambda', 'unit', 'if', 'then', 'else', 'in']
+
+
+block_label_regex = r'^L([0-9]|_)*$'
+block_phi_assignment_vars = {}
+buffer_assignments_anf_ssa = {}
+
+
+def reset():
+    global ssa_ast_global,block_identifier,buffer_variable_counter,keywords,block_label_regex,buffer_assignments_anf_ssa,buffer_assignments,block_phi_assignment_vars
+    ssa_ast_global = None
+    buffer_assignments = {}
+    buffer_variable_counter = 0
+    block_phi_assignment_vars = {}
+    buffer_assignments_anf_ssa = {}
+
 
 class ANFNode:
     def __init__(self):
@@ -115,7 +148,7 @@ class ANF_E_APP(ANF_E):
                 return get_indentation(lvl) + (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
             for (pattern, value) in function_mapping_ext.items():
                 if pattern.match(self.name.name):
-                    return get_indentation(lvl) + (value % ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+                    return get_indentation(lvl) + (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
             if re.match('L([0-9]|_)*', self.name.name):
                 return get_indentation(lvl) + self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)
 
@@ -241,7 +274,7 @@ class ANF_E_IF(ANF_E):
 
         # If the labels of gotos are i and i+1 it shows as the pattern which is generated when parsing a while loop
         # Otherwise it would be i and i+2 because the block i+1 would be after the if-else block
-        if int(goto1) + 1 == int(goto2):
+        if (goto2 == '' or int(goto1) + 1 == int(goto2)) and ('L' + str(int(goto1) - 1) + '(' in if_out):
             if_out = '\n'.join(if_out.split('\n')[0:-1])
             return (get_indentation(lvl) + 'while ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + ':\n'
                     + if_out + '\n' + remove_indentation(else_out, 1) + '\n')
@@ -263,7 +296,7 @@ class ANF_E_IF(ANF_E):
         post_if_else = assignments['L' + str(int(goto1) + 1)].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) if 'L' + str(int(goto1) + 1) in assignments else ''
 
         # If there is no content left in the else branch do not print any else content
-        else_out = '' if else_out == '' else ('\n' + get_indentation(lvl) + 'else:\n' + else_out + '\n' )
+        else_out = '\n' if else_out == '' else ('\n' + get_indentation(lvl) + 'else:\n' + else_out + '\n' )
         return get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) + ':\n' + if_out + else_out + post_if_else
 
 class ANF_V(ANF_EV):
@@ -374,22 +407,9 @@ def remove_indentation(code, i):
 
 def parse_ssa_to_anf(ssa: SSA_AST, debug: bool):
     global debug_mode
+    reset()
     debug_mode = debug
     return SA(ssa)
-
-
-# Global reference of the SSA AST to be transformed
-ssa_ast_global: SSA_AST = None
-
-# Prefix of block labels from SSA
-block_identifier = 'L'
-
-# Buffer variables mapped to ANF nodes to replace more complex code due to only values being allowed to be used in function calls
-buffer_assignments = {}
-buffer_variable_counter = 0
-
-# Keywords to be ignored when parsing ANF code due to special handling
-keywords = ['let', 'letrec', 'lambda', 'unit', 'if', 'then', 'else', 'in']
 
 
 # Transform SSA AST into ANF AST
@@ -552,7 +572,9 @@ def parse_anf_from_text(code: str):
     lines = code.split('\n')
     code_lines, info_lines = zip(*[tuple(line.split('#')) for line in lines])
     code_lines = [re.sub(' +', ' ', line) for line in code_lines]
-    return parse_anf_e_from_code([word for line in code_lines for word in line.strip().split(' ')], [info_word for line in info_lines for info_word in line.strip().split(';')])
+    code_words = [word if i % 2 == 0 else (('\'' + part + '\'') if j == 0 else None) for line in code_lines for i, part in enumerate(line.strip().split('\'')) for j, word in enumerate(part.strip().split(' '))]
+    code_words = list(filter(lambda e: e is not None, code_words))
+    return parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(';')])
 
 
 # Convert an ANF code expression to ANF AST
@@ -627,9 +649,6 @@ def parse_anf_to_ssa(anf_ast):
     return SSA_AST(procs, blocks)
 
 
-block_label_regex = r'^L([0-9]|_)*$'
-block_phi_assignment_vars = {}
-buffer_assignments_anf_ssa = {}
 def parse_anf_to_ssa2(term):
     global block_phi_assignment_vars
     if isinstance(term, ANF_E_LETREC):

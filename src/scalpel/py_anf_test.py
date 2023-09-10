@@ -6,14 +6,15 @@ import pytest
 from .py_anf_transformer import test_link
 
 
+
 def pytest_generate_tests(metafunc):
     filenames = []
     directory = './test_samples'
-    for file in os.listdir(directory):
-        if not file == '__init__.py':
-            print(file)
-            filenames.append(file)
-    metafunc.parametrize("filename", filenames)
+    if 'filename' in metafunc.fixturenames:
+        for file in os.listdir(directory):
+            if not file == '__init__.py':
+                filenames.append(file)
+        metafunc.parametrize("filename", filenames)
 
 
 # Testing df_index shape against the dummy dataframe
@@ -26,5 +27,4 @@ def test_back_transformation(filename: str):
         sys.stdout = captured_output  # and redirect stdout.
         test_link(f, True)  # Call unchanged function.
         sys.stdout = sys.__stdout__
-
         assert(captured_output.getvalue() == file.read())

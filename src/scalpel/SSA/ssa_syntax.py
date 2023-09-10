@@ -27,10 +27,48 @@ operator_map = {
 
 
 
+# Global variables to store SSA variable data while transforming a single CFG
+ssa_results_stored = {}
+ssa_results_loads = {}
+ssa_results_phi_stored = {}
+ssa_results_phi_loads = {}
+const_dict = {}
+
+# Global used variable names to prevent duplicate names
+used_var_names = {}
+
+# Prefix for new variables from the transformation
+buffer_var_name = "_ssa_"
+buffer_counter = 0  # Index for new buffer variables (postfix)
+
+# Mapping dict of nodes to their new buffer variable name to be replaced with when occurring in the translation
+buffer_assignments = {}
+
+# Mapping of blocks to their corresponding label if already created
+block_refs = {}
+
+# Stores additional statments to be added at the end of the block
+addon_statements_per_block = {}
+
+block_phi_assignment_vars = {}
+buffer_assignments_ssa_py = {}
 
 
 
-
+def reset():
+    global ssa_results_stored,ssa_results_loads,ssa_results_phi_stored,ssa_results_phi_loads,const_dict,used_var_names,buffer_counter,buffer_assignments,block_refs,addon_statements_per_block,block_phi_assignment_vars,buffer_assignments_ssa_py
+    ssa_results_stored = {}
+    ssa_results_loads = {}
+    ssa_results_phi_stored = {}
+    ssa_results_phi_loads = {}
+    const_dict = {}
+    used_var_names = {}
+    buffer_counter = 0
+    buffer_assignments = {}
+    block_refs = {}
+    addon_statements_per_block = {}
+    block_phi_assignment_vars = {}
+    buffer_assignments_ssa_py = {}
 
 
 
@@ -371,30 +409,6 @@ class ProvInfo:
         return p
 
 
-# Global variables to store SSA variable data while transforming a single CFG
-ssa_results_stored = {}
-ssa_results_loads = {}
-ssa_results_phi_stored = {}
-ssa_results_phi_loads = {}
-const_dict = {}
-
-# Global used variable names to prevent duplicate names
-used_var_names = {}
-
-# Prefix for new variables from the transformation
-buffer_var_name = "_ssa_"
-buffer_counter = 0  # Index for new buffer variables (postfix)
-
-# Mapping dict of nodes to their new buffer variable name to be replaced with when occurring in the translation
-buffer_assignments = {}
-
-# Mapping of blocks to their corresponding label if already created
-block_refs = {}
-
-# Stores additional statments to be added at the end of the block
-addon_statements_per_block = {}
-
-
 # Update the list of global names to include the new ones found in the last checked cfg
 def update_used_vars(vars_stored, constants):
     global used_var_names
@@ -556,6 +570,8 @@ def preprocess_py_code(code):
 
 def PY_to_SSA_AST(code_str: str, debug: bool):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names, debug_mode
+
+    reset()
 
     debug_mode = debug
     # Preprocess Python code (Slicing and simple transformations (ex. List Comp -> For Loop))
@@ -768,7 +784,10 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         # TODO a.b:int = 10 (class variable)
         return [SSA_E_ASS(variable, PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
     elif isinstance(stmt, ast.Raise):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Raise_' + str(1 + len(stmt.exc.args))), [PS_E(prov_info, curr_block, stmt.exc.func, st_nr, False)] + [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])]
+        if stmt.cause is not None:
+            return [SSA_V_FUNC_CALL(SSA_V_VAR('_Raise_2'), [SSA_V_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])] +
+                                    [PS_E(prov_info, curr_block, stmt.cause, st_nr, False)])]
+        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Raise_1'), [SSA_V_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])])]
     elif isinstance(stmt, ast.Assert):
         args = [PS_E(prov_info, curr_block, stmt.test, st_nr, False)]
         name = '_Assert'
@@ -1029,7 +1048,6 @@ def parse_ssa_to_python_blocks(next_exits, blocks_visited, ind_lvl):
                 for term in block.ssa_terms:
                     print('\t' * ind_lvl + term.print(0))
 
-block_phi_assignment_vars = {}
-buffer_assignments_ssa_py = {}
+
 def parse_ssa_to_anf2(term):
     pass
