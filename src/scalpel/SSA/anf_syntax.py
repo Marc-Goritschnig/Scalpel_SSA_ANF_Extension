@@ -14,35 +14,35 @@ function_mapping_ext = {
 }
  #_Raise_ _Assert _Pass _Break _Continue _new_tuple_ _new_dict_ _new_set_ _new_list_ _List_Slice(LUS) _LSD_Get _str_format3 _ADD
 function_mapping = {
-    '_And': '%s and %s',
-    '_Or': '%s or %s',
-    '_Add': '%s + %s',
-    '_Sub': '%s - %s',
-    '_Mult': '%s * %s',
+    '_And': '(%s and %s)',
+    '_Or': '(%s or %s)',
+    '_Add': '(%s + %s)',
+    '_Sub': '(%s - %s)',
+    '_Mult': '(%s * %s)',
     '_MatMult ': 'unknown',
-    '_Div': '%s / %s',
-    '_Mod ': '%s % %s',
-    '_Pow': '%s ** %s',
-    '_LShift': '%s << %s',
-    '_RShift': '%s >> %s',
-    '_BitOr': '%s | %s',
-    '_BitXor': '%s ^ %s',
-    '_BitAnd': '%s & %s',
-    '_FloorDiv': '%s // %s',
-    '_Invert': '~%s',
-    '_Not': 'not %s',
-    '_UAdd': '+%s',
-    '_USub': '-%s',
-    '_Eq': '%s == %s',
-    '_NotEq': '%s != %s',
-    '_Lt': '%s < %s',
-    '_LtE': '%s <= %s',
-    '_Gt': '%s > %s',
-    '_GtE': '%s >= %s',
-    '_Is': '%s is %s',
-    '_IsNot': '%s is not %s',
-    '_In': '%s in %s',
-    '_NotIn': '%s not in %s',
+    '_Div': '(%s / %s)',
+    '_Mod ': '(%s % %s)',
+    '_Pow': '(%s ** %s)',
+    '_LShift': '(%s << %s)',
+    '_RShift': '(%s >> %s)',
+    '_BitOr': '(%s | %s)',
+    '_BitXor': '(%s ^ %s)',
+    '_BitAnd': '(%s & %s)',
+    '_FloorDiv': '(%s // %s)',
+    '_Invert': '(~%s)',
+    '_Not': '(not %s)',
+    '_UAdd': '(+%s)',
+    '_USub': '(-%s)',
+    '_Eq': '(%s == %s)',
+    '_NotEq': '(%s != %s)',
+    '_Lt': '(%s < %s)',
+    '_LtE': '(%s <= %s)',
+    '_Gt': '(%s > %s)',
+    '_GtE': '(%s >= %s)',
+    '_Is': '(%s is %s)',
+    '_IsNot': '(%s is not %s)',
+    '_In': '(%s in %s)',
+    '_NotIn': '(%s not in %s)',
     '_LSD_Get': '%s[%s]',
     '_Raise_1': 'raise %s',
     '_Raise_2': 'raise %s from %s',
@@ -221,12 +221,12 @@ class ANF_E_LETREC(ANF_E):
                     assignments[self.var.name] = self.term2
                     return self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl, False)
         elif isinstance(self.term2, ANF_V_FUNC):
-            return get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            return get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + '\n' + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
 
         vars = get_function_parameter_recursive(self.term1)
         next_term = get_next_non_function_term(self.term1)
         newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
-        return get_indentation(lvl) + 'def ' + self.var.print(0, None) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        return get_indentation(lvl) + 'def ' + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + newline + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
 
 
 def get_function_parameter_recursive(next):
@@ -324,6 +324,7 @@ class ANF_V_CONST(ANF_V):
         return 'c'
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
+        #value = normalize_name(self.value)
         return get_indentation(lvl) + self.value
 
 class ANF_V_VAR(ANF_V):
@@ -340,11 +341,16 @@ class ANF_V_VAR(ANF_V):
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if self.name in assignments:
             return get_indentation(lvl) + assignments[self.name].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        idx = self.name.rfind('_')
-        if idx == -1:
-            idx = len(self.name)
-        name = self.name[0:idx]
+        name = normalize_name(self.name)
         return get_indentation(lvl) + name
+
+
+def normalize_name(name: str):
+    idx = name.rfind('_')
+    if idx == -1:
+        idx = len(name)
+    return name[0:idx]
+
 
 class ANF_V_UNIT(ANF_V):
     def __init__(self):

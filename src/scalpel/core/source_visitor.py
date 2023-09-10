@@ -1,4 +1,4 @@
-import ast
+import ast_comments as ast
 
 from .class_visitor import ClassVisitor
 from .fun_def_visitor import FunDefVisitor

@@ -4,7 +4,9 @@ files are fed into this module to generate a frontend object for both parsing
 and code instrumentation. In addition, scope information can also be given for
 fine-grained operations.
 """
-import ast
+import ast_comments as ast
+
+import ast_comments
 
 from scalpel.core.util import UnitWalker
 
@@ -107,7 +109,7 @@ class MNode:
         Build AST tree for th source
         """
         try:
-            self.ast = ast.parse(self.source)
+            self.ast = ast_comments.parse(self.source)
         except Exception as e:
             self.ast = None
 

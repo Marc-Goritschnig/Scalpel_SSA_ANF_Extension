@@ -3,8 +3,9 @@ This implementation is partly adapted from the static cfg project
 https://github.com/coetaur0/staticfg
 """
 
-import ast
 import sys
+
+import ast_comments as ast
 
 from ..core.func_call_visitor import get_func_calls
 from .model import CFG, Block, Link
@@ -401,6 +402,10 @@ class CFGBuilder(ast.NodeVisitor):
         self.goto_new_block(node)
 
     def visit_Delete(self, node):
+        self.add_statement(self.current_block, node)
+        self.goto_new_block(node)
+
+    def visit_Comment(self, node):
         self.add_statement(self.current_block, node)
         self.goto_new_block(node)
 

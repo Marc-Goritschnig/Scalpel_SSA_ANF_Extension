@@ -2,10 +2,11 @@
 In this module, the single static assignment forms are  implemented to allow
 further analysis. The module contain a single class named SSA.
 """
-import ast
+import ast_comments as ast
 from collections import OrderedDict
 from functools import reduce
 
+import ast_comments
 import astor
 import networkx as nx
 
@@ -38,7 +39,7 @@ class SSA:
         """
         # the class SSA takes a module as the input
         self.src = src  # source code
-        self.module_ast = ast.parse(src)
+        self.module_ast = ast_comments.parse(src)
         self.numbering = {}  # numbering variables
         self.var_values = {}  # numbering variables
         self.m_node = MNode("tmp")

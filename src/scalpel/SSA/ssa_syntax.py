@@ -1,6 +1,7 @@
 from __future__ import annotations
-import ast
 import re
+
+import ast_comments as ast
 
 from scalpel.core.mnode import MNode
 from scalpel.SSA.const import SSA
@@ -545,7 +546,7 @@ def preprocess_py_code(code):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
 
-                new_code = ast.unparse(node.target) + ' = ' + ast.unparse(node.target) + ' ' + operator_map[type(node.op)] + ' ' + ast.unparse(node.value)
+                new_code = ast.unparse(node.target) + ' = ' + ast.unparse(node.target) + ' ' + operator_map[type(node.op)] + ' (' + ast.unparse(node.value) + ')'
                 lines[node.lineno - 1] = line[:node.col_offset] + new_code + line[node.end_col_offset:]
                 code = '\n'.join(lines)
                 replaced = True
@@ -795,6 +796,8 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
             name = '_Assert_2'
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
         return [SSA_V_FUNC_CALL(SSA_V_VAR(name), args)]
+    elif isinstance(stmt, ast.Comment):
+        return []
     elif isinstance(stmt, ast.Pass):
         return [SSA_V_FUNC_CALL(SSA_V_VAR('_Pass'), [])]
     elif isinstance(stmt, ast.Break):
@@ -836,6 +839,8 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             return SSA_V_CONST("'" + stmt.value + "'")
         else:
             return SSA_V_CONST(stmt.value)
+    elif isinstance(stmt, ast.Comment):
+        return stmt
     elif isinstance(stmt, ast.Slice):
         return SSA_V_CONST(stmt.value)
     elif isinstance(stmt, ast.Tuple):

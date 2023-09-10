@@ -1,8 +1,10 @@
-import ast
+import ast_comments as ast
 import os
 import pkgutil
 import sys
 from _ast import *
+
+import ast_comments
 
 
 def iter_fields(node):
@@ -48,7 +50,7 @@ def iter_stmt_children(node):
 
 def find_local_modules(import_smts):
     smts = "\n".join(import_smts)
-    tree = ast.parse(smts, mode="exec")
+    tree = ast_comments.parse(smts, mode="exec")
     search_path = ["."]
     module_names = set()
     for node in ast.walk(tree):
@@ -181,7 +183,7 @@ def UnitWalker(module_node):
 class StmtIterator:
     def __init__(self, src):
         self.src = src
-        self.ast = ast.parse(src)
+        self.ast = ast_comments.parse(src)
         assert hasattr(self.ast, "body")
         self.working_stack = [self.ast.body]
 

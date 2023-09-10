@@ -1,4 +1,4 @@
-import ast
+import ast_comments as ast
 
 
 class VarsVisitor(ast.NodeVisitor):
