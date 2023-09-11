@@ -9,8 +9,9 @@ debug_mode = False
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
 function_mapping_ext = {
     re.compile(r'^_new_list_([0-9])+$'): '[%s]',
-    re.compile(r'^_Delete_([0-9])+$'): 'del %s'
-
+    re.compile(r'^_Delete_([0-9])+$'): 'del %s',
+    re.compile(r'^_new_tuple_([0-9])+$'): '(%s)',
+    re.compile(r'^_new_set_([0-9])+$'): 'set(%s)'
 }
  #_Raise_ _Assert _Pass _Break _Continue _new_tuple_ _new_dict_ _new_set_ _new_list_ _List_Slice(LUS) _LSD_Get _str_format3 _ADD
 function_mapping = {
@@ -46,6 +47,17 @@ function_mapping = {
     '_LSD_Get': '%s[%s]',
     '_Raise_1': 'raise %s',
     '_Raise_2': 'raise %s from %s',
+    '_Assert': 'assert (%s)',
+    '_Pass': 'pass',
+    '_Break': 'break',
+    '_Continue': 'continue',
+    '_List_Slice_L': '%s[%s:]',
+    '_List_Slice_U': '%s[:%s]',
+    '_List_Slice_US': '%s[:%s:%s]',
+    '_List_Slice_LS': '%s[%s::%s]',
+    '_List_Slice_LU': '%s[%s:%s]',
+    '_List_Slice_LUS': '%s[%s:%s:%s]',
+    'tuple_get': '%s[%s]'
 }
 
 # Global reference of the SSA AST to be transformed
@@ -155,6 +167,23 @@ class ANF_E_APP(ANF_E):
         out = get_indentation(lvl) + self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]) + ')'
         return out
 
+
+class ANF_E_COMM(ANF_E):
+    def __init__(self, text: str, term: ANF_E):
+        super().__init__()
+        self.text: str = text
+        self.term: ANF_E = term
+
+    def print(self, lvl = 0, prov_info: str = ''):
+        return f"{self.term.print(lvl)}"
+
+    def get_prov_info(self, prov_info):
+        return self.text + ';' + self.term.get_prov_info(None)
+
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
+        return self.text + '\n' + self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+
+
 class ANF_E_LET(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E):
         super().__init__()
@@ -177,7 +206,9 @@ class ANF_E_LET(ANF_E):
             return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
         out = get_indentation(lvl) + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + ' = ' + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        return "\n".join([s for s in out.split("\n") if s])
+        out = "\n".join([s for s in out.split("\n") if s])
+        out = post_processing_anf_to_python(out)
+        return out
 
 class ANF_E_LETREC(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E):
@@ -511,7 +542,8 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
     if issubclass(type(term), SSA_V):
         unwrap_inner_applications_naming(term)
         return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:])))
-
+    if issubclass(type(term), SSA_E_COMM):
+        return ANF_E_COMM(term.text, SA_ES(b, terms[1:]))
     return ANF_E_APP([], ANF_V_CONST('Not-Impl'))
 
 
@@ -569,23 +601,27 @@ def print_anf_with_prov_info(anf_parent: ANFNode):
     out = anf_parent.print()
     prov = anf_parent.get_prov_info(None)
     max_chars = max([len(line) + line.count('\t') * 3 for line in out.split('\n')]) + 2
-    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + '#' + info for line, info in zip(out.split('\n'), prov.split('\n'))])
+    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + '#&#' + info for line, info in zip(out.split('\n'), prov.split('\n'))])
 
 
 # Read anf code and parse it into internal ANF AST representation
 def parse_anf_from_text(code: str):
     code = code.strip()
     lines = code.split('\n')
-    code_lines, info_lines = zip(*[tuple(line.split('#')) for line in lines])
+    code_lines, info_lines = zip(*[tuple(line.split('#&#')) for line in lines])
     code_lines = [re.sub(' +', ' ', line) for line in code_lines]
-    code_words = [word if i % 2 == 0 else (('\'' + part + '\'') if j == 0 else None) for line in code_lines for i, part in enumerate(line.strip().split('\'')) for j, word in enumerate(part.strip().split(' '))]
+    code_words = [word if i % 2 == 0 else (('\'' + part + '\'') if j == 0 else None) for line in code_lines for i, part in enumerate(line.strip().split('\'')) for j, word in enumerate(part.strip().split(' '))  if part != ' ']
     code_words = list(filter(lambda e: e is not None, code_words))
-    return parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(';')])
-
+    aa = parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(';')])
+    return aa
 
 # Convert an ANF code expression to ANF AST
 def parse_anf_e_from_code(code_words, info_words):
     next_word = code_words[0]
+
+    # Found a comment within provenance information
+    if info_words[0][0] == '#':
+        return ANF_E_COMM(info_words[0], parse_anf_e_from_code(code_words[0:], info_words[1:]))
     if next_word == 'let':
         variable = ANF_V_VAR(code_words[1])
         right = parse_anf_e_from_code(code_words[3:], info_words[3:])
@@ -639,7 +675,11 @@ def parse_anf_v_from_code(code_word: str, info_word: str):
 def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str], close_keys: [str]):
     indentation = 1
     idx = 0
+    comment_offset = 0
     for i, w in enumerate(code_words):
+        if len(info_words[i]) > 0:
+            if info_words[i][0] == '#':
+                comment_offset += 1
         if w in open_keys:
             indentation += 1
         elif w in close_keys:
@@ -647,7 +687,8 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
         if indentation == 0:
             idx = i
             break
-    return parse_anf_e_from_code(code_words[idx + 1:], info_words[idx + 1:])
+
+    return parse_anf_e_from_code(code_words[idx + 1:], info_words[idx + 1 + comment_offset:])
 
 
 def parse_anf_to_ssa(anf_ast):
@@ -750,3 +791,8 @@ def get_name_from_buffer(name):
     if name in buffer_assignments_anf_ssa:
         return buffer_assignments_anf_ssa[name].print(0)
     return name
+
+
+def post_processing_anf_to_python(code):
+    # iterate over ast and check comments for markers like aug assign then the next sasignment should be changed to an aug assign
+    return code

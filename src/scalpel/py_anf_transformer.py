@@ -4,6 +4,7 @@ import re
 import argparse
 
 import ast_comments as ast
+import ast as ast2
 
 from functions import trim_double_spaces
 
@@ -89,20 +90,21 @@ def transform():
 
         # Parsing the anf code back to Python
         anf_to_python = parsed.parse_anf_to_python({}, [], [])
-        if debug_mode:
-            print('Parsed Python code from ANF to Python test printed:')
-            print(ast.unparse(ast.parse(anf_to_python)))
-            print('\n\n\n')
-            print('Parsed Python code from ANF to SSA test printed:')
-            print(parse_anf_to_ssa(parsed).print())
-            print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
-            print('\n\n\n')
-            print('\n\n\n')
+        # if debug_mode:
+            # print('Parsed Python code from ANF to Python test printed:')
+            # print(ast.unparse(ast.parse(anf_to_python)))
+            # print('\n\n\n')
+            # print('Parsed Python code from ANF to SSA test printed:')
+            # print(parse_anf_to_ssa(parsed).print())
+            # print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
+            # print('\n\n\n')
+            # print('\n\n\n')
 
         # print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
 
+        print(anf_to_python)
         x = ast.parse(anf_to_python)
-        print(ast.unparse(x), end='')
+        print(ast.unparse(x))
 
 # Transform the ast tree back to Python
     # TODO: Implementation of back transformation
@@ -160,3 +162,7 @@ if __name__ == '__main__':
 
 # TODO Talk about:
 # TODO ast.Attrobute - class function calls like obj.getMap() => cl_fun_[#args](obj, getMap, args...)
+
+# Wrong ast node types given for List, Tuple, Dict, Set replace all with strings to name comparisons
+# Dict target is subscript preprocessing
+# mark attribute functions and map them

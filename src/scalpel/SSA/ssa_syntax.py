@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-
+import ast as ast2
 import ast_comments as ast
 
 from scalpel.core.mnode import MNode
@@ -199,6 +199,21 @@ class SSA_E_ASS_PHI(SSA_E):
 
     def parse_to_python(self, lvl):
         return self.var.parse_to_python(lvl) + ' ' + font['assign'] + ' ' + font['phi'] + print_args_to_python(self.args, lvl)
+
+
+class SSA_E_COMM(SSA_E):
+    def __init__(self, text: str):
+        super().__init__()
+        self.text: str = text
+
+    def print(self, lvl):
+        return f"{self.text}"
+
+    def print_latex(self, lvl):
+        return ""
+
+    def parse_to_python(self, lvl):
+        return f"{self.text}"
 
 
 class SSA_E_ASS(SSA_E):
@@ -520,7 +535,7 @@ def preprocess_py_code(code):
                 for g in node.generators:
                     new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
                     indentation += 4
-                new_lines.append(indentation * ' ' + buffer_var + '.add(' + ast.unparse(node.elt) + ')')
+                new_lines.append(indentation * ' ' + buffer_var + '._set_add(' + ast.unparse(node.elt) + ')')
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
@@ -751,7 +766,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
 # Parse a Python statement
 def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
-        if isinstance(stmt.targets[0], ast.Tuple):
+        if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple):
             tuple_name = get_buffer_var()
             post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_V_FUNC_CALL(SSA_V_VAR('tuple_get'), [SSA_V_VAR(tuple_name), SSA_V_CONST(str(idx))])) for idx, var in enumerate(stmt.targets[0].elts)]
             return [SSA_E_ASS(SSA_V_VAR(tuple_name), PS_E(prov_info, curr_block, stmt.value, st_nr, True))] + post_stmts
@@ -797,7 +812,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
         return [SSA_V_FUNC_CALL(SSA_V_VAR(name), args)]
     elif isinstance(stmt, ast.Comment):
-        return []
+        return [SSA_E_COMM(stmt.value)]
     elif isinstance(stmt, ast.Pass):
         return [SSA_V_FUNC_CALL(SSA_V_VAR('_Pass'), [])]
     elif isinstance(stmt, ast.Break):
@@ -811,6 +826,10 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
 
 # Parse a Python expression
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
+    a = isinstance(stmt, ast2.Constant)
+    a2 = isinstance(stmt, ast.Constant)
+    a3 = stmt.__class__.__name__
+    print(a)
     if isinstance(stmt, ast.BinOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
     elif isinstance(stmt, ast.BoolOp):
@@ -839,17 +858,15 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             return SSA_V_CONST("'" + stmt.value + "'")
         else:
             return SSA_V_CONST(stmt.value)
-    elif isinstance(stmt, ast.Comment):
-        return stmt
     elif isinstance(stmt, ast.Slice):
         return SSA_V_CONST(stmt.value)
-    elif isinstance(stmt, ast.Tuple):
+    elif isinstance(stmt, ast.Tuple) or isinstance(stmt, ast2.Tuple):
         return SSA_V_FUNC_CALL(SSA_V_VAR('_new_tuple_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
-    elif isinstance(stmt, ast.Dict):
+    elif stmt.__class__.__name__ == 'Dict':
         return SSA_V_FUNC_CALL(SSA_V_VAR('_new_dict_' + str(len(stmt.keys))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for args in zip(stmt.keys, stmt.values) for arg in args])
     elif isinstance(stmt, ast.Set):
         return SSA_V_FUNC_CALL(SSA_V_VAR('_new_set_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
-    elif isinstance(stmt, ast.List):
+    elif isinstance(stmt, ast.List) or isinstance(stmt, ast2.List): # somehow ast_comments generates ast.List nodes instead of ast_comments.List
         return SSA_V_FUNC_CALL(SSA_V_VAR('_new_list_' + str(len(stmt.elts))), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts])
     elif isinstance(stmt, ast.Subscript):
         if isinstance(stmt.slice, ast.Slice):
