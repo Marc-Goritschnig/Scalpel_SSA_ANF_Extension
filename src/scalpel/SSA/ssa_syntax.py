@@ -826,10 +826,6 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
 
 # Parse a Python expression
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
-    a = isinstance(stmt, ast2.Constant)
-    a2 = isinstance(stmt, ast.Constant)
-    a3 = stmt.__class__.__name__
-    print(a)
     if isinstance(stmt, ast.BinOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)])
     elif isinstance(stmt, ast.BoolOp):

@@ -6,7 +6,7 @@ import argparse
 import ast_comments as ast
 import ast as ast2
 
-from functions import trim_double_spaces
+from .functions import trim_double_spaces
 
 print('Absolute path: ', os.path.abspath(__file__))
 content_root = re.split(r'(\\|/)*scalpel', os.path.abspath(__file__))[0]
@@ -101,10 +101,8 @@ def transform():
             # print('\n\n\n')
 
         # print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
-
-        print(anf_to_python)
         x = ast.parse(anf_to_python)
-        print(ast.unparse(x))
+        print(add_missing_blank_lines(add_missing_blank_lines(ast.unparse(x))))
 
 # Transform the ast tree back to Python
     # TODO: Implementation of back transformation
@@ -119,6 +117,43 @@ def test_link(path: str, back: bool):
     debug_mode = False
     parse_back = back
     transform()
+
+
+def add_missing_blank_lines(input_code):
+    # Parse the input code into an Abstract Syntax Tree (AST)
+    tree = ast.parse(input_code)
+
+    # Helper function to add two blank lines after the end of a function block
+    def add_blank_lines(node):
+        lines = input_code.split('\n')
+        end_lineno = node.end_lineno  # Line number of the last line of the function block
+        added = False
+
+        # Check if there are no blank lines after the function block
+        if end_lineno < len(lines) and lines[end_lineno].strip() != '':
+            lines.insert(end_lineno, '')  # Add a blank line after the end of the function block
+            lines.insert(end_lineno, '')  # Add a blank line after the end of the function block
+            added = True
+        elif end_lineno < len(lines) - 1 and lines[end_lineno + 1].strip() != '':
+            lines.insert(end_lineno, '')  # Add a blank line after the end of the function block
+            added = True
+
+        return '\n'.join(lines), added
+
+    new_code = input_code
+
+    # recursively call the function until no more lines are added
+    added = False
+    for node in ast.walk(tree):
+        added = False
+        if isinstance(node, ast.FunctionDef):
+            new_code, added = add_blank_lines(node)
+        if added:
+            break
+    if added:
+        add_missing_blank_lines(new_code)
+    return new_code
+
 
 def str2bool(v):
     if isinstance(v, bool):

@@ -90,7 +90,7 @@ def reset():
 
 class ANFNode:
     def __init__(self):
-        pass
+        self.prov_info = ''
 
     def print(self, lvl = 0):
         return 'not implemented'
@@ -109,6 +109,11 @@ class ANFNode:
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return None
 
+    def print_prov_ext(self):
+        prov = ''
+        if self.prov_info != '':
+            prov = '|' + self.prov_info
+        return prov
 
 class ANF_EV(ANFNode):
     def __init__(self):
@@ -147,26 +152,28 @@ class ANF_E_APP(ANF_E):
         return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
     def get_prov_info(self, prov_info):
-        return 'f' + self.name.get_prov_info(None) + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
+        return 'f' + self.name.get_prov_info(None) + self.print_prov_ext() + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
+        out = None
         if isinstance(self.name, ANF_V_CONST):
             if re.match('L([0-9]|_)*', self.name.value):
                 if self.name.value in assignments and self.name.value not in parsed_blocks:
                     parsed_blocks.append(self.name.value)
-                    return assignments[self.name.value].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        if isinstance(self.name, ANF_V_VAR):
+                    out = assignments[self.name.value].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+                    return postprocessing_ANF_V_to_python(self, out)
+        elif isinstance(self.name, ANF_V_VAR):
             if self.name.name in function_mapping:
-                return get_indentation(lvl) + (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+                out = (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
             for (pattern, value) in function_mapping_ext.items():
                 if pattern.match(self.name.name):
-                    return get_indentation(lvl) + (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+                    out = (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
             if re.match('L([0-9]|_)*', self.name.name):
-                return get_indentation(lvl) + self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)
-
-        out = get_indentation(lvl) + self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]) + ')'
-        return out
-
+                out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)
+        if out is None:
+            # Default output if nothing applies
+            out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]) + ')'
+        return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, out)
 
 class ANF_E_COMM(ANF_E):
     def __init__(self, text: str, term: ANF_E):
@@ -328,7 +335,8 @@ class ANF_E_IF(ANF_E):
 
         # If there is no content left in the else branch do not print any else content
         else_out = '\n' if else_out == '' else ('\n' + get_indentation(lvl) + 'else:\n' + else_out + '\n' )
-        return get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) + ':\n' + if_out + else_out + post_if_else
+        out = get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) + ':\n' + if_out + else_out + post_if_else
+        return out
 
 class ANF_V(ANF_EV):
     def __init__(self):
@@ -352,11 +360,16 @@ class ANF_V_CONST(ANF_V):
         return f"{self.value}"
 
     def get_prov_info(self, prov_info):
-        return 'c'
+        return 'c' + self.print_prov_ext()
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         #value = normalize_name(self.value)
-        return get_indentation(lvl) + self.value
+        return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, self.value)
+
+def postprocessing_ANF_V_to_python(n: ANFNode, out: str):
+    if n.prov_info == 'RET':
+        return 'return ' + out
+    return out
 
 class ANF_V_VAR(ANF_V):
     def __init__(self, name: str):
@@ -367,13 +380,13 @@ class ANF_V_VAR(ANF_V):
         return f"{self.name}"
 
     def get_prov_info(self, prov_info):
-        return 'v'
+        return 'v' + self.print_prov_ext()
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if self.name in assignments:
-            return get_indentation(lvl) + assignments[self.name].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, assignments[self.name].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl))
         name = normalize_name(self.name)
-        return get_indentation(lvl) + name
+        return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, name)
 
 
 def normalize_name(name: str):
@@ -535,7 +548,9 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         if term.value is None:
             return ANF_V_UNIT()
         unwrap_inner_applications_naming(term.value)
-        return unwrap_inner_applications_let_structure(term.value, SA_V(term.value))
+        x = SA_V(term.value)
+        x.prov_info = 'RET'
+        return unwrap_inner_applications_let_structure(term.value, x)
     if isinstance(term, SSA_E_IF_ELSE):
         unwrap_inner_applications_naming(term.test, True)
         return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else])), True)
@@ -660,14 +675,20 @@ def parse_anf_e_from_code(code_words, info_words):
 
 
 # Convert an ANF code value to ANF AST
-def parse_anf_v_from_code(code_word: str, info_word: str):
-    if info_word == 'c':
-        return ANF_V_CONST(code_word)
-    if info_word == 'v':
-        return ANF_V_VAR(code_word)
-    if info_word.startswith('f'):
-        return ANF_E_APP([], parse_anf_v_from_code(code_word, info_word[1:]))
+def parse_anf_v_from_code(code_word: str, info_word_with_prov: str):
+    info_word_parts = info_word_with_prov.split('|')
+    info_word = info_word_parts[0]
 
+    n = None
+    if info_word == 'c':
+        n = ANF_V_CONST(code_word)
+    if info_word == 'v':
+        n = ANF_V_VAR(code_word)
+    if info_word.startswith('f'):
+        n = ANF_E_APP([], parse_anf_v_from_code(code_word, info_word[1:]))
+    if n is not None and len(info_word_parts) > 1:
+        n.prov_info = info_word_parts[1]
+    return n
 
 # Get the position of the next part belonging to the given one
 # Ex. We start at a "letrec" and want to find its "in"
