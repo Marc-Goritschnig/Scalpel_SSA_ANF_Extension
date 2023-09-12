@@ -1,5 +1,5 @@
 def fun():
-    print("a")
+    print('a')
 
 
 fun()

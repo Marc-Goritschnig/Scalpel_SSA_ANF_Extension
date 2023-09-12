@@ -815,5 +815,19 @@ def get_name_from_buffer(name):
 
 
 def post_processing_anf_to_python(code):
+    output = ''
+    lines = code.split('\n')
+    skip = 0
+
     # iterate over ast and check comments for markers like aug assign then the next sasignment should be changed to an aug assign
-    return code
+    for i in range(len(lines)):
+        line = lines[i]
+        if skip > 0:
+            skip -= 1
+            continue
+        if line == '# AugAssign':
+            output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*.\s*(.*)', r'\1 += \2\3', lines[i + 1]) + '\n'
+            skip = 1
+        else:
+            output += line + '\n'
+    return output

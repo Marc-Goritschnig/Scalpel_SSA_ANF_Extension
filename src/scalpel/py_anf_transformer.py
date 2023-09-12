@@ -6,7 +6,7 @@ import argparse
 import ast_comments as ast
 import ast as ast2
 
-from .functions import trim_double_spaces
+from functions import trim_double_spaces
 
 print('Absolute path: ', os.path.abspath(__file__))
 content_root = re.split(r'(\\|/)*scalpel', os.path.abspath(__file__))[0]
