@@ -826,7 +826,7 @@ def post_processing_anf_to_python(code):
             skip -= 1
             continue
         if line == '# AugAssign':
-            output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*.\s*(.*)', r'\1 += \2\3', lines[i + 1]) + '\n'
+            output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
             skip = 1
         else:
             output += line + '\n'

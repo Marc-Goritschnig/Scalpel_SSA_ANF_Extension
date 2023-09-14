@@ -560,9 +560,11 @@ def preprocess_py_code(code):
             elif isinstance(node, ast.AugAssign):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
+                indentation = len(re.findall(r"^ *", line)[0])
 
                 new_code = ast.unparse(node.target) + ' = ' + ast.unparse(node.target) + ' ' + operator_map[type(node.op)] + ' (' + ast.unparse(node.value) + ')'
                 lines[node.lineno - 1] = line[:node.col_offset] + new_code + line[node.end_col_offset:]
+                lines = lines[:node.lineno - 1] + [(indentation * ' ') + '# AugAssign'] + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
                 break
