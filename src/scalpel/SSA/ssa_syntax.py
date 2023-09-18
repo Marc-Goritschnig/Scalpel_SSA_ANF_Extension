@@ -464,6 +464,10 @@ def replace_code_with_content(lines, line_from, line_to, col_from, col_to, conte
 # Preprocessing of Python code before parsing it into SSA
 # This function converts the following nodes into simpler nodes:
 # Lambda, ListComp
+def get_tab():
+    return '   '
+
+
 def preprocess_py_code(code):
     replaced = True
     while replaced:
@@ -564,7 +568,7 @@ def preprocess_py_code(code):
 
                 new_code = ast.unparse(node.target) + ' = ' + ast.unparse(node.target) + ' ' + operator_map[type(node.op)] + ' (' + ast.unparse(node.value) + ')'
                 lines[node.lineno - 1] = line[:node.col_offset] + new_code + line[node.end_col_offset:]
-                lines = lines[:node.lineno - 1] + [(indentation * ' ') + '# AugAssign'] + lines[node.lineno - 1:]
+                lines = lines[:node.lineno - 1] + [(indentation * ' ') + '#-SSA-AugAssign'] + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -575,10 +579,11 @@ def preprocess_py_code(code):
                 lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
 
                 indentation = len(re.findall(r"^ *", line)[0])
-                new_code = indentation * ' ' + 'if ' + ast.unparse(node.test) + ':\n' \
-                           + indentation * ' ' + '\t' + buffer_var + ' = ' + ast.unparse(node.body) \
-                           + indentation * ' ' + '\nelse:\n' \
-                           + indentation * ' ' + '\t' + buffer_var + ' = '+ ast.unparse(node.orelse)
+                new_code = ( indentation * ' ' + '#-SSA-IfExp\n'
+                            + indentation * ' ' + 'if ' + ast.unparse(node.test) + ':\n' \
+                           + indentation * ' ' + get_tab() + buffer_var + ' = ' + ast.unparse(node.body) + '\n'\
+                           + indentation * ' ' + 'else:\n' \
+                           + indentation * ' ' + get_tab() + buffer_var + ' = '+ ast.unparse(node.orelse))
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True
@@ -1066,7 +1071,7 @@ def parse_ssa_to_python_blocks(next_exits, blocks_visited, ind_lvl):
                 blocks_visited.add(block)
                 next_exits += block.exits
                 for term in block.ssa_terms:
-                    print('\t' * ind_lvl + term.print(0))
+                    print(get_tab() * ind_lvl + term.print(0))
 
 
 def parse_ssa_to_anf2(term):

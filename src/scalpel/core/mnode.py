@@ -6,8 +6,6 @@ fine-grained operations.
 """
 import ast_comments as ast
 
-import ast_comments
-
 from scalpel.core.util import UnitWalker
 
 from ..cfg.builder import CFGBuilder
@@ -90,7 +88,7 @@ class MNode:
         results = get_vars(wanted_ast)
         return results
 
-    def gen_import_relations():
+    def gen_import_relations(self):
         pass
 
     def parse_func_calls(self, scope=""):
@@ -109,7 +107,7 @@ class MNode:
         Build AST tree for th source
         """
         try:
-            self.ast = ast_comments.parse(self.source)
+            self.ast = ast.parse(self.source)
         except Exception as e:
             self.ast = None
 

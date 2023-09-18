@@ -188,7 +188,14 @@ class ANF_E_COMM(ANF_E):
         return self.text + ';' + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
-        return self.text + '\n' + self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        out = self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        #if self.text.startswith('#-SSA-'):
+        #    out = out.split('\n')
+        #    out = [out[0] + self.text] + out[1:]
+        #    out = '\n'.join(out)
+        #else:
+        out = get_indentation(lvl) + self.text + '\n' + out
+        return post_processing_anf_to_python(out)
 
 
 class ANF_E_LET(ANF_E):
@@ -326,7 +333,11 @@ class ANF_E_IF(ANF_E):
         # Remove the block label function calls which are at the end of the parsed codes if the program does not stop there
         # If so there would be no label and there should not be the last line removed
         if_lines = if_out.split('\n')
+        while if_lines[-1] == '':
+            if_lines = if_lines[0:-1]
         else_lines = else_out.split('\n')
+        while else_lines[-1] == '':
+            else_lines = else_lines[0:-1]
         if block_call_pattern.match(if_lines[-1].strip()):
             if_out = '\n'.join(if_lines[0:-1])
         if block_call_pattern.match(else_lines[-1].strip()):
@@ -825,9 +836,30 @@ def post_processing_anf_to_python(code):
         if skip > 0:
             skip -= 1
             continue
-        if line == '# AugAssign':
+        if '#-SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
             skip = 1
+        elif '#-SSA-IfExp' in line:
+            indentation = len(re.findall(r"^ *", lines[i + 2])[0])
+            if_term = re.sub(r'^(.*)if (.*):(.)*', r'\2',lines[i + 1])
+            ssa_var, if_val = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2',lines[i + 2]).split(';')
+            j = 3
+            while not (lines[i + j].startswith(indentation * ' ' + ssa_var)):
+                j += 1
+            else_block = [line[4:] for line in lines[i+6:i+j]]
+            else_val = re.sub(r'^ *(.*)\s=\s(.*)', r'\2', lines[i + j])
+            j += 1
+            while not (lines[i + j].startswith((indentation - 4) * ' ') and ssa_var in lines[i + j]):
+                j += 1
+            if_exp = if_val + ' if ' + if_term + ' else ' + else_val
+            line = lines[i + j].replace(ssa_var, if_exp)
+
+            code_after = []
+            if j + 1 < len(lines):
+                code_after = lines[j + 1:]
+
+            lines = lines[:i] + [line] + else_block + code_after
+            return post_processing_anf_to_python('\n'.join(lines))
         else:
             output += line + '\n'
     return output

@@ -6,7 +6,7 @@ import argparse
 import ast_comments as ast
 import ast as ast2
 
-from functions import trim_double_spaces
+from .functions import trim_double_spaces
 
 print('Absolute path: ', os.path.abspath(__file__))
 content_root = re.split(r'(\\|/)*scalpel', os.path.abspath(__file__))[0]
@@ -30,6 +30,7 @@ debug_mode = True
 print_CFG_graph = False
 parse_back = False
 
+
 def transform():
     # Print cfg into file
     if print_CFG_graph:
@@ -48,6 +49,8 @@ def transform():
     if python_code_path is not None:
         with open(python_code_path, 'r') as file:
             py_code = file.read()
+
+    # print(ast.unparse(ast.parse(py_code)))
 
     # Create a SSA AST from python code
     ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
@@ -100,7 +103,7 @@ def transform():
             # print('\n\n\n')
             # print('\n\n\n')
 
-        # print(parse_ssa_to_python(parse_anf_to_ssa(parsed)))
+        # print(anf_to_python)
         x = ast.parse(anf_to_python)
         print(add_missing_blank_lines(add_missing_blank_lines(ast.unparse(x))))
 
