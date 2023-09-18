@@ -339,6 +339,10 @@ class ANF_E_IF(ANF_E):
         else_lines = else_out.split('\n')
         while else_lines[-1] == '':
             else_lines = else_lines[0:-1]
+            # If there is no else branch we will end up with nothing and need to handle this
+            if len(else_lines) == 0:
+                else_lines = ['']
+                break
         if block_call_pattern.match(if_lines[-1].strip()):
             if_out = '\n'.join(if_lines[0:-1])
         if block_call_pattern.match(else_lines[-1].strip()):
@@ -834,11 +838,21 @@ def post_processing_anf_to_python(code):
     # iterate over ast and check comments for markers like aug assign then the next sasignment should be changed to an aug assign
     for i in range(len(lines)):
         line = lines[i]
+        line_strip = line.strip()
         if skip > 0:
             skip -= 1
             continue
         if '#-SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
+            skip = 1
+        elif line_strip.startswith('#-SSA-AnnAssign'):
+            indentation = len(re.findall(r"^ *", lines[i + 1])[0])
+            _, t, simple = line_strip.split('|')
+            p1, p2 = lines[i + 1].strip().split(' = ')
+            new_line = (indentation * ' ') + p1 + ': ' + t + ' = ' + p2 + '\n'
+            if simple == '0':
+                new_line = (indentation * ' ') + '(' + p1 + '): ' + t + ' = ' + p2 + '\n'
+            output += new_line
             skip = 1
         elif '#-SSA-IfExp' in line:
             indentation = len(re.findall(r"^ *", lines[i + 2])[0])

@@ -296,8 +296,16 @@ class SSA:
             for phi_var in block_phi_variables_needed[block.id]:
                 stmt_renamed_loaded = {}
                 stmt_renamed_loaded[phi_var] = self.recursive_find_var_usages_in_predecessors(phi_var, block_renamed_stored, block_renamed_phi_stored, block.predecessors)
-                block_renamed_phi_loaded[block.id] += [stmt_renamed_loaded]
-
+                # Phi assignment is only needed if there are multiple possible values, not for example there is an if statement where a local variable is used and not set before the if block
+                if len(stmt_renamed_loaded[phi_var]) > 1:
+                    block_renamed_phi_loaded[block.id] += [stmt_renamed_loaded]
+                else:
+                    # Otherwise we do not add the assignment and need to remove the previously added stored phi
+                    i = 0
+                    for bb in block_renamed_phi_stored[block.id]:
+                        if phi_var in bb.keys():
+                            idx = i
+                    del block_renamed_phi_stored[block.id][idx]
         return block_renamed_stored, block_renamed_loaded, block_renamed_phi_stored, block_renamed_phi_loaded, ident_const_dict
 
 
