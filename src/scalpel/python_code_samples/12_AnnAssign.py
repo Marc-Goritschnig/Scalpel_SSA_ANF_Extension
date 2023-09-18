@@ -1,3 +1,5 @@
-a: int = 10
-(b): int = 10
-#a.b: int = 10
+#sdf1
+b = 10
+#sdf2
+b = 10
+#sdf3

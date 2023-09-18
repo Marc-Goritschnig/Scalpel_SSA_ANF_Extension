@@ -579,11 +579,25 @@ def preprocess_py_code(code):
                 lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
 
                 indentation = len(re.findall(r"^ *", line)[0])
-                new_code = ( indentation * ' ' + '#-SSA-IfExp\n'
+                new_code = (indentation * ' ' + '#-SSA-IfExp\n'
                             + indentation * ' ' + 'if ' + ast.unparse(node.test) + ':\n' \
-                           + indentation * ' ' + get_tab() + buffer_var + ' = ' + ast.unparse(node.body) + '\n'\
-                           + indentation * ' ' + 'else:\n' \
-                           + indentation * ' ' + get_tab() + buffer_var + ' = '+ ast.unparse(node.orelse))
+                            + indentation * ' ' + get_tab() + buffer_var + ' = ' + ast.unparse(node.body) + '\n' \
+                            + indentation * ' ' + 'else:\n' \
+                            + indentation * ' ' + get_tab() + buffer_var + ' = ' + ast.unparse(node.orelse))
+                lines.insert(node.lineno - 1, new_code)
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.AnnAssign):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                value_str = ''
+                if hasattr(node, 'value'):
+                    value_str = ' = ' + ast.unparse(node.value)
+                lines[node.lineno - 1] = line[:node.col_offset] + ast.unparse(node.target) + value_str + line[node.end_col_offset:]
+
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_code = (indentation * ' ') + '#-SSA-AnnAssign|' + node.annotation.id + '|' + str(node.simple)
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True

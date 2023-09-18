@@ -5,6 +5,7 @@ import re
 
 font = {'lambda_sign': 'λ'}
 debug_mode = False
+comment_separator = '$'
 
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
 function_mapping_ext = {
@@ -627,14 +628,14 @@ def print_anf_with_prov_info(anf_parent: ANFNode):
     out = anf_parent.print()
     prov = anf_parent.get_prov_info(None)
     max_chars = max([len(line) + line.count('\t') * 3 for line in out.split('\n')]) + 2
-    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + '#&#' + info for line, info in zip(out.split('\n'), prov.split('\n'))])
+    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + comment_separator + info for line, info in zip(out.split('\n'), prov.split('\n'))])
 
 
 # Read anf code and parse it into internal ANF AST representation
 def parse_anf_from_text(code: str):
     code = code.strip()
     lines = code.split('\n')
-    code_lines, info_lines = zip(*[tuple(line.split('#&#')) for line in lines])
+    code_lines, info_lines = zip(*[tuple(line.split(comment_separator)) for line in lines])
     code_lines = [re.sub(' +', ' ', line) for line in code_lines]
     code_words = [word if i % 2 == 0 else (('\'' + part + '\'') if j == 0 else None) for line in code_lines for i, part in enumerate(line.strip().split('\'')) for j, word in enumerate(part.strip().split(' '))  if part != ' ']
     code_words = list(filter(lambda e: e is not None, code_words))
@@ -709,8 +710,8 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
     idx = 0
     comment_offset = 0
     for i, w in enumerate(code_words):
-        if len(info_words[i]) > 0:
-            if info_words[i][0] == '#':
+        if len(info_words[i + comment_offset]) > 0:
+            if info_words[i + comment_offset][0] == '#':
                 comment_offset += 1
         if w in open_keys:
             indentation += 1
