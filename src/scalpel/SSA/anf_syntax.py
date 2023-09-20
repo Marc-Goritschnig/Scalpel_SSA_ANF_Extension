@@ -854,6 +854,24 @@ def post_processing_anf_to_python(code):
                 new_line = (indentation * ' ') + '(' + p1 + '): ' + t + ' = ' + p2 + '\n'
             output += new_line
             skip = 1
+        elif '#-SSA-FOR' in line and len(lines) > i + 5:
+            indentation = len(re.findall(r"^ *", lines[i + 1])[0])
+            _, arr = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2', lines[i + 1]).split(';')
+            variable, _ = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2', lines[i + 2]).split(';')
+            indentation2 = len(re.findall(r"^ *", lines[i + 5])[0])
+            j = 5
+            while lines[i + j].startswith(indentation2 * ' '):
+                j += 1
+                if i + j == len(lines):
+                    break
+            loop_body = lines[i + 5:j-1]
+
+            code_after = []
+            if i + j < len(lines):
+                code_after = lines[i + j:]
+
+            lines = lines[:i] + [indentation * ' ' + 'for ' + variable + ' in ' + arr + ':\n'] + loop_body + code_after
+            return post_processing_anf_to_python('\n'.join(lines))
         elif '#-SSA-IfExp' in line:
             indentation = len(re.findall(r"^ *", lines[i + 2])[0])
             if_term = re.sub(r'^(.*)if (.*):(.)*', r'\2',lines[i + 1])
@@ -866,12 +884,14 @@ def post_processing_anf_to_python(code):
             j += 1
             while not (lines[i + j].startswith((indentation - 4) * ' ') and ssa_var in lines[i + j]):
                 j += 1
+                if i + j == len(lines):
+                    break
             if_exp = if_val + ' if ' + if_term + ' else ' + else_val
             line = lines[i + j].replace(ssa_var, if_exp)
 
             code_after = []
-            if j + 1 < len(lines):
-                code_after = lines[j + 1:]
+            if i+j+1 < len(lines):
+                code_after = lines[i+j+1:]
 
             lines = lines[:i] + [line] + else_block + code_after
             return post_processing_anf_to_python('\n'.join(lines))

@@ -1,6 +1,8 @@
 from __future__ import annotations
 import re
 import ast as ast2
+from collections.abc import Iterable
+
 import ast_comments as ast
 
 from scalpel.core.mnode import MNode
@@ -509,6 +511,19 @@ def preprocess_py_code(code):
                     code = '\n'.join(lines)
                     replaced = True
                 break
+            elif isinstance(node, ast.For):
+                _CONTAINER_ATTRS = ["body", "handlers", "orelse", "finalbody"]
+                last_node = node.body[-1]
+                for attr in _CONTAINER_ATTRS:
+                    if items := getattr(last_node, attr, None):
+                        if not isinstance(items, Iterable):
+                            continue
+                        node.body.append(ast.parse('#-SSA-Placeholder'))
+                        replaced = True
+                        code = ast.unparse(tree)
+                        break
+                if replaced:
+                    break
             elif isinstance(node, ast.ListComp):
                 # TODO ifs not handled
                 lines = code.split('\n')
@@ -763,6 +778,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     stmts.append(SSA_E_ASS(old_iter_var, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)])))
     stmts.append(SSA_E_GOTO(SSA_L(new_block_name)))
 
+    stmts.insert(0, SSA_E_COMM('#-SSA-FOR'))
     b = SSA_B(block_ref, stmts, first_in_proc)
 
     stmts2 = []
@@ -777,12 +793,25 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
 
     stmts2.append(SSA_E_IF_ELSE(SSA_V_VAR(buffer), SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target)), else_ref))
 
-    block.exits[0].target.exits[len(block.exits[0].target.exits) - 1].target = CFGBlockMock(new_block_name, block.exits)
-    addon_statements_per_block[block.exits[0].target] = [SSA_E_ASS(old_iter_var2, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)]))]
+    # TODO Search through blocks within the block.exits[0] recursively for exits to "block" and replace them with the mock block
+    ret_block = replace_and_find_returning_loop_block([], block, block, CFGBlockMock(new_block_name, block.exits))
+    # block.exits[0].target.exits[len(block.exits[0].target.exits) - 1].target = CFGBlockMock(new_block_name, block.exits)
+    addon_statements_per_block[ret_block] = [SSA_E_ASS(old_iter_var2, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)]))]
     b2 = SSA_B(SSA_L(new_block_name), stmts2, first_in_proc)
 
     return [b, b2]
 
+def replace_and_find_returning_loop_block(visited, block, find, replace_block):
+    if block not in visited:
+        visited.append(block)
+        for e in block.exits:
+            res = replace_and_find_returning_loop_block(visited, e.target, find, replace_block)
+            if res is not None:
+                return res
+            if e.target == find:
+                e.target = replace_block
+                return e.source
+    return None
 
 # Parse a Python statement
 def PS_S(prov_info, curr_block, stmt, st_nr):
@@ -833,6 +862,8 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
         return [SSA_V_FUNC_CALL(SSA_V_VAR(name), args)]
     elif isinstance(stmt, ast.Comment):
+        if stmt.value == '#-SSA-Placeholder':
+            return []
         return [SSA_E_COMM(stmt.value)]
     elif isinstance(stmt, ast.Pass):
         return [SSA_V_FUNC_CALL(SSA_V_VAR('_Pass'), [])]
