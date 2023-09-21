@@ -257,7 +257,8 @@ class ANF_E_LETREC(ANF_E):
 
         if re.match(block_label_regex, self.var.name):
             assignments[self.var.name] = self.term1.term
-            return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            out = self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            return post_processing_anf_to_python(out)
 
         if isinstance(self.var, ANF_V_VAR):
             if self.var.name.startswith(block_identifier) and isinstance(self.term2, ANF_E_APP):
@@ -265,15 +266,17 @@ class ANF_E_LETREC(ANF_E):
                     # L1 = XXX in L1
                     # Return just XXX and store XXX if still L1 is called somewhere else
                     assignments[self.var.name] = self.term2
-                    return self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl, False)
+                    out = self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl, False)
+                    return post_processing_anf_to_python(out)
         elif isinstance(self.term2, ANF_V_FUNC):
-            return get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + '\n' + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            out = get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + '\n' + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            return post_processing_anf_to_python(out)
 
         vars = get_function_parameter_recursive(self.term1)
         next_term = get_next_non_function_term(self.term1)
         newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
-        return get_indentation(lvl) + 'def ' + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + newline + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-
+        out = get_indentation(lvl) + 'def ' + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + newline + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        return post_processing_anf_to_python(out)
 
 def get_function_parameter_recursive(next):
     if isinstance(next, ANF_V_FUNC):
@@ -844,6 +847,16 @@ def post_processing_anf_to_python(code):
             continue
         if '#-SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
+            skip = 1
+        elif re.match('def (_ssa_)[0-9]*\(.*', line_strip):
+            name, args = re.sub(r'def (_ssa_.*)\((.*)\).*', r'\1;\2', lines[i]).split(';')
+            code = lines[i + 1]
+            lines[i] = ''
+            lines[i + 1] = ''
+            j = 2
+            while i + j < len(lines):
+                lines[i + j] = re.sub(name + '([^\w_0-9]+|$)+', 'lambda ' + args + ': ' + code, lines[i + j])
+                j += 1
             skip = 1
         elif line_strip.startswith('#-SSA-AnnAssign'):
             indentation = len(re.findall(r"^ *", lines[i + 1])[0])
