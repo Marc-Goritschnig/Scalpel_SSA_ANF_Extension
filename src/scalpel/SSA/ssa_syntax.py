@@ -617,6 +617,7 @@ def preprocess_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
+
     return code
 
 
@@ -871,6 +872,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         return [SSA_V_FUNC_CALL(SSA_V_VAR('_Break'), [])]
     elif isinstance(stmt, ast.Continue):
         return [SSA_V_FUNC_CALL(SSA_V_VAR('_Continue'), [])]
+
     if debug_mode:
         print("Nothing matched for statement: ", stmt)
     return []

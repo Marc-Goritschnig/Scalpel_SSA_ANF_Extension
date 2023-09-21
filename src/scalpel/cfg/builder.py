@@ -619,10 +619,12 @@ class CFGBuilder(ast.NodeVisitor):
     def visit_Break(self, node):
         assert len(self.after_loop_block_stack), "Found break not inside loop"
         self.add_exit(self.current_block, self.after_loop_block_stack[-1])
+        self.add_statement(self.current_block, node)
 
     def visit_Continue(self, node):
         assert len(self.curr_loop_guard_stack), "Found continue outside loop"
-        self.add_exit(self.current_block, self.curr_loop_guard_stack[-1])
+        self.add_exit(self.current_block, self.after_loop_block_stack[-1])
+        self.add_statement(self.current_block, node)
 
     def visit_Import(self, node):
         self.add_statement(self.current_block, node)
