@@ -848,6 +848,22 @@ def post_processing_anf_to_python(code):
         if '#-SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
             skip = 1
+        elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line:
+            indentation = len(re.findall(r"^ *", lines[i + 1])[0])
+            variable = lines[i + 1].split('=')[0].strip()
+            j = 2
+            out = ''
+            while re.match(r'^ *for.*', lines[i + j]):
+                out = out + lines[i + j].split(':')[0].strip() + ' '
+                j += 1
+            value = re.sub(r'^ *.*\(' + variable + ',(.*)\).*', r'\1', lines[i + j]).strip()
+            out = value + ' ' + out
+            if '#-SSA-ListComp' in line:
+                out = (indentation * ' ') + '[' + out + ']' + '\n'
+            else:
+                out = (indentation * ' ') + '{' + out + '}' + '\n'
+            output = lines[i + j + 1].replace(variable, out)
+            skip = j + 1
         elif re.match('def (_ssa_)[0-9]*\(.*', line_strip):
             name, args = re.sub(r'def (_ssa_.*)\((.*)\).*', r'\1;\2', lines[i]).split(';')
             code = lines[i + 1]

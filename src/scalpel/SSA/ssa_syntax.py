@@ -3,8 +3,7 @@ import re
 import ast as ast2
 from collections.abc import Iterable
 
-import ast_comments as ast
-
+from scalpel import ast_comments as ast
 from scalpel.core.mnode import MNode
 from scalpel.SSA.const import SSA
 
@@ -27,7 +26,6 @@ operator_map = {
     ast.BitAnd: '&',
     ast.FloorDiv: '//',
 }
-
 
 
 # Global variables to store SSA variable data while transforming a single CFG
@@ -518,7 +516,7 @@ def preprocess_py_code(code):
                     if items := getattr(last_node, attr, None):
                         if not isinstance(items, Iterable):
                             continue
-                        node.body.append(ast.parse('#-SSA-Placeholder'))
+                        node.body.append(ast.parse('#-SSA-Placeholder').body[0])
                         replaced = True
                         code = ast.unparse(tree)
                         break
@@ -539,6 +537,26 @@ def preprocess_py_code(code):
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '.append(' + ast.unparse(node.elt) + ')')
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-ListComp')
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.SetComp):
+                # TODO ifs not handled
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                buffer_var = get_buffer_var()
+                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+
+                new_lines = []
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_lines.append(indentation * ' ' + buffer_var + ' = {}')
+                for g in node.generators:
+                    new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
+                    indentation += 4
+                new_lines.append(indentation * ' ' + buffer_var + '.add(' + ast.unparse(node.elt) + ')')
+                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-SetComp')
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -862,7 +880,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
             name = '_Assert_2'
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
         return [SSA_V_FUNC_CALL(SSA_V_VAR(name), args)]
-    elif isinstance(stmt, ast.Comment):
+    elif stmt.__class__.__name__ == ast.Comment.__name__:
         if stmt.value == '#-SSA-Placeholder':
             return []
         return [SSA_E_COMM(stmt.value)]
