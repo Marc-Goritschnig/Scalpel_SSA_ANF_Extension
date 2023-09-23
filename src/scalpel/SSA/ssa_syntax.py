@@ -979,7 +979,7 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         #parts.reverse()
         out = parts[0]
         for part in parts[1:]:
-            out = SSA_V_FUNC_CALL(SSA_L('_ADD'), [out, part])
+            out = SSA_V_FUNC_CALL(SSA_V_VAR('_Add'), [out, part])
         return out
 
     if debug_mode:

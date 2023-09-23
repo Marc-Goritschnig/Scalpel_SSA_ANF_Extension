@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+import ast
+
 from scalpel.SSA.ssa_syntax import *
 
 import re
@@ -840,16 +843,47 @@ def post_processing_anf_to_python(code):
 
     # iterate over ast and check comments for markers like aug assign then the next sasignment should be changed to an aug assign
     for i in range(len(lines)):
-        line = lines[i]
-        line_strip = line.strip()
         if skip > 0:
             skip -= 1
             continue
+
+        line = lines[i]
+        line_strip = line.strip()
         if '#-SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
             skip = 1
+        elif '_str_format' in line_strip:
+            v3 = None
+            if '_str_format2' in line_strip:
+                start, content = line_strip.split('_str_format2')
+                _, content, end = extract_main_parenthesis(content)
+                v1, v2 = re.sub(r'\(*(.*),(.*)\)*', r'\1;\2', content).split(';')
+            else:
+                start, content = line_strip.split('_str_format3')
+                _, content, end = extract_main_parenthesis(content)
+                v1, v2, v3 = re.sub(r'\(*(.*),(.*[^\(\)]),(.*[^\(\)])\)*', r'\1;\2;\3', content).split(';')
+
+            gen_node = ast.parse('print(f\'{10:.3}\')')
+            n: ast.FormattedValue = gen_node.body[0].value.args[0].values[0]
+            n.value = ast.parse(v1)
+            n.conversion = int(v2)
+            n.format_spec = None
+
+            format = ''
+            if v3 is not None:
+                format = ':' + v3.strip().replace('\'', '')
+
+            out = start + ast.unparse(n)[1:-2] + format + '}\'' + end + '\n'
+            out = out.replace('\'', 'f\'', 1)
+            out = out.replace('ff\'', 'f\'', 1)
+            out = ast.unparse(ast.parse(out).body[0])
+            out = out.replace('\' + \'{', '{', 1)
+            out = out.replace('}\' + \'', '}', 1)
+            out = out.replace('\' + \'', '', 1)
+
+            lines[i] = out
+            return output + post_processing_anf_to_python('\n'.join(lines[i:]))
         elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line:
-            indentation = len(re.findall(r"^ *", lines[i + 1])[0])
             variable = lines[i + 1].split('=')[0].strip()
             j = 2
             out = ''
@@ -859,10 +893,11 @@ def post_processing_anf_to_python(code):
             value = re.sub(r'^ *.*\(' + variable + ',(.*)\).*', r'\1', lines[i + j]).strip()
             out = value + ' ' + out
             if '#-SSA-ListComp' in line:
-                out = (indentation * ' ') + '[' + out + ']' + '\n'
+                out = '[' + out + ']' + '\n'
             else:
-                out = (indentation * ' ') + '{' + out + '}' + '\n'
-            output = lines[i + j + 1].replace(variable, out)
+                out = '{' + out + '}' + '\n'
+
+            output += lines[i + j + 1].replace(variable, out)
             skip = j + 1
         elif re.match('def (_ssa_)[0-9]*\(.*', line_strip):
             name, args = re.sub(r'def (_ssa_.*)\((.*)\).*', r'\1;\2', lines[i]).split(';')
@@ -899,8 +934,8 @@ def post_processing_anf_to_python(code):
             if i + j < len(lines):
                 code_after = lines[i + j:]
 
-            lines = lines[:i] + [indentation * ' ' + 'for ' + variable + ' in ' + arr + ':\n'] + loop_body + code_after
-            return post_processing_anf_to_python('\n'.join(lines))
+            lines = [indentation * ' ' + 'for ' + variable + ' in ' + arr + ':\n'] + loop_body + code_after
+            return output + post_processing_anf_to_python('\n'.join(lines))
         elif '#-SSA-IfExp' in line:
             indentation = len(re.findall(r"^ *", lines[i + 2])[0])
             if_term = re.sub(r'^(.*)if (.*):(.)*', r'\2',lines[i + 1])
@@ -922,8 +957,23 @@ def post_processing_anf_to_python(code):
             if i+j+1 < len(lines):
                 code_after = lines[i+j+1:]
 
-            lines = lines[:i] + [line] + else_block + code_after
-            return post_processing_anf_to_python('\n'.join(lines))
+            lines = [line] + else_block + code_after
+            return output + post_processing_anf_to_python('\n'.join(lines))
         else:
             output += line + '\n'
     return output
+
+def extract_main_parenthesis(input):
+    indentation = 0
+    start = 0
+    for i in range(len(input)):
+        if input[i] == '(':
+            indentation += 1
+            if indentation == 1:
+                start = i + 1
+        if input[i] == ')':
+            indentation -= 1
+            if indentation == 0:
+                if len(input) > i + 1:
+                    return input[:start], input[start:i], input[i+1:]
+                return input[:start], input[start:i], ''

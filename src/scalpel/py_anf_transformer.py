@@ -63,6 +63,7 @@ def transform():
     # Create an ANF AST from SSA AST
     anf_ast = parse_ssa_to_anf(ssa_ast, debug_mode)
     anf_ast.enable_print_ascii()
+
     if debug_mode:
         print("Transformed AST tree printed:")
 
