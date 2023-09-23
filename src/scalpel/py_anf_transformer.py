@@ -6,7 +6,7 @@ import argparse
 import ast_comments as ast
 import ast as ast2
 
-from .functions import trim_double_spaces
+from scalpel.functions import trim_double_spaces
 
 print('Absolute path: ', os.path.abspath(__file__))
 content_root = re.split(r'(\\|/)*scalpel', os.path.abspath(__file__))[0]
@@ -108,7 +108,7 @@ def transform():
         x = ast.parse(anf_to_python)
         print(add_missing_blank_lines(add_missing_blank_lines(ast.unparse(x))))
 
-# Transform the ast tree back to Python
+    # Transform the ast tree back to Python
     # TODO: Implementation of back transformation
 
     # Other TODOs test

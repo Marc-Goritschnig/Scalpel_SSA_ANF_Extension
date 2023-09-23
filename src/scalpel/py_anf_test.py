@@ -2,8 +2,7 @@ import io
 import os
 import sys
 
-import pytest
-from .py_anf_transformer import test_link
+from scalpel.py_anf_transformer import test_link
 
 
 
