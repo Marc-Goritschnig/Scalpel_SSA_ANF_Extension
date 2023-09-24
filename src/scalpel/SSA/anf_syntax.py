@@ -883,6 +883,17 @@ def post_processing_anf_to_python(code):
 
             lines[i] = out
             return output + post_processing_anf_to_python('\n'.join(lines[i:]))
+        elif '#-SSA-Tuple' in line:
+            indentation = len(re.findall(r"^ *", lines[i + 1])[0])
+            var, values = re.sub(r'^ *(.*)\s=\s\((.*)\)', r'\1;\2', lines[i + 1]).split(';')
+            values = values.split(',')
+            j = 2
+            vars = []
+            for v in values:
+                vars.append(lines[i + j].split(' = ')[0].strip())
+                j += 1
+            output += '(' + ', '.join(vars) + ') = (' + ', '.join(values) + ')\n'
+            skip = len(values) + 1
         elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line:
             variable = lines[i + 1].split('=')[0].strip()
             j = 2

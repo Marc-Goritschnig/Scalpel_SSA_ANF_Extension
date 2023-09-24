@@ -838,7 +838,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple):
             tuple_name = get_buffer_var()
             post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_V_FUNC_CALL(SSA_V_VAR('tuple_get'), [SSA_V_VAR(tuple_name), SSA_V_CONST(str(idx))])) for idx, var in enumerate(stmt.targets[0].elts)]
-            return [SSA_E_ASS(SSA_V_VAR(tuple_name), PS_E(prov_info, curr_block, stmt.value, st_nr, True))] + post_stmts
+            return [SSA_E_COMM('#-SSA-Tuple')] + [SSA_E_ASS(SSA_V_VAR(tuple_name), PS_E(prov_info, curr_block, stmt.value, st_nr, True))] + post_stmts
         return [SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
     elif isinstance(stmt, ast.If):
         if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
