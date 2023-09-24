@@ -523,8 +523,25 @@ def preprocess_py_code(code):
                         break
                 if replaced:
                     break
+            elif isinstance(node, ast.DictComp):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                buffer_var = get_buffer_var()
+                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+
+                new_lines = []
+                indentation = len(re.findall(r"^ *", line)[0])
+                new_lines.append(indentation * ' ' + buffer_var + ' = []')
+                for g in node.generators:
+                    new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
+                    indentation += 4
+                new_lines.append(indentation * ' ' + buffer_var + '[' +ast.unparse(node.key) + '] = ' + ast.unparse(node.value))
+                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
+                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-CompComp')
+                code = '\n'.join(lines)
+                replaced = True
+                break
             elif isinstance(node, ast.ListComp):
-                # TODO ifs not handled
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
                 buffer_var = get_buffer_var()
@@ -543,7 +560,6 @@ def preprocess_py_code(code):
                 replaced = True
                 break
             elif isinstance(node, ast.SetComp):
-                # TODO ifs not handled
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
                 buffer_var = get_buffer_var()

@@ -897,14 +897,21 @@ def post_processing_anf_to_python(code):
             part2 = '(' + ', '.join(values) + ')' if parenthesis[1] == '1' else ', '.join(values)
             output += part1 + ' = ' + part2 + '\n'
             skip = len(values) + 1
-        elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line:
+        elif '#-SSA-ListComp' in line or '#-SSA-SetComp' or '#-SSA-DictComp' in line:
             variable = lines[i + 1].split('=')[0].strip()
             j = 2
             out = ''
+
             while re.match(r'^ *for.*', lines[i + j]):
                 out = out + lines[i + j].split(':')[0].strip() + ' '
                 j += 1
-            value = re.sub(r'^ *.*\(' + variable + ',(.*)\).*', r'\1', lines[i + j]).strip()
+
+            if '#-SSA-DictComp' in line:
+                value = re.sub(r'^ *.*\[(.*)\] = (.*)', r'\1\2', lines[i + j]).strip().split(';')
+                value = value[0] + ': ' + value[1]
+            else:
+                value = re.sub(r'^ *.*\(' + variable + ',(.*)\).*', r'\1', lines[i + j]).strip()
+
             out = value + ' ' + out
             if '#-SSA-ListComp' in line:
                 out = '[' + out + ']' + '\n'
