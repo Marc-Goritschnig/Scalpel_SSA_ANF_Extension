@@ -892,7 +892,10 @@ def post_processing_anf_to_python(code):
             for v in values:
                 vars.append(lines[i + j].split(' = ')[0].strip())
                 j += 1
-            output += '(' + ', '.join(vars) + ') = (' + ', '.join(values) + ')\n'
+            parenthesis = line_strip.split('#-SSA-Tuple')[1]
+            part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
+            part2 = '(' + ', '.join(values) + ')' if parenthesis[1] == '1' else ', '.join(values)
+            output += part1 + ' = ' + part2 + '\n'
             skip = len(values) + 1
         elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line:
             variable = lines[i + 1].split('=')[0].strip()

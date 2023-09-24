@@ -34,6 +34,7 @@ ssa_results_loads = {}
 ssa_results_phi_stored = {}
 ssa_results_phi_loads = {}
 const_dict = {}
+original_code_lines = []
 
 # Global used variable names to prevent duplicate names
 used_var_names = {}
@@ -640,11 +641,13 @@ def preprocess_py_code(code):
 
 
 def PY_to_SSA_AST(code_str: str, debug: bool):
-    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names, debug_mode
+    global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names, debug_mode, original_code_lines
 
     reset()
 
     debug_mode = debug
+    original_code_lines = code_str.split('\n')
+
     # Preprocess Python code (Slicing and simple transformations (ex. List Comp -> For Loop))
     code_str = preprocess_py_code(code_str)
 
@@ -838,7 +841,10 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple):
             tuple_name = get_buffer_var()
             post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_V_FUNC_CALL(SSA_V_VAR('tuple_get'), [SSA_V_VAR(tuple_name), SSA_V_CONST(str(idx))])) for idx, var in enumerate(stmt.targets[0].elts)]
-            return [SSA_E_COMM('#-SSA-Tuple')] + [SSA_E_ASS(SSA_V_VAR(tuple_name), PS_E(prov_info, curr_block, stmt.value, st_nr, True))] + post_stmts
+            parts = original_code_lines[stmt.lineno - 1].split(' = ')
+            parenthesis = '1' if '(' in parts[0] else '0'
+            parenthesis += '1' if '(' in parts[1] else '0'
+            return [SSA_E_COMM('#-SSA-Tuple' + parenthesis)] + [SSA_E_ASS(SSA_V_VAR(tuple_name), PS_E(prov_info, curr_block, stmt.value, st_nr, True))] + post_stmts
         return [SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True))]
     elif isinstance(stmt, ast.If):
         if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
