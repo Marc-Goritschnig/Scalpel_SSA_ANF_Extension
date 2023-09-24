@@ -883,6 +883,11 @@ def post_processing_anf_to_python(code):
 
             lines[i] = out
             return output + post_processing_anf_to_python('\n'.join(lines[i:]))
+        elif '#-SSA-NamedExpr' in line:
+            var, val = re.sub(r'^ *(.*) = (.*)', r'\1;\2', lines[i + 1]).split(';')
+            start, var_part, end = re.sub(r'(.*)(([^a-zA-z]|^)' + var + '([^a-zA-z]|$))(.*)', r'\1;\2;\5', lines[i + 2]).split(';')
+            lines[i + 2] = start + var_part.replace(var, '(' + var + ' := ' + val + ')') + end
+            skip = 1
         elif '#-SSA-Tuple' in line:
             indentation = len(re.findall(r"^ *", lines[i + 1])[0])
             var, values = re.sub(r'^ *(.*)\s=\s\((.*)\)', r'\1;\2', lines[i + 1]).split(';')
@@ -895,9 +900,9 @@ def post_processing_anf_to_python(code):
             parenthesis = line_strip.split('#-SSA-Tuple')[1]
             part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
             part2 = '(' + ', '.join(values) + ')' if parenthesis[1] == '1' else ', '.join(values)
-            output += part1 + ' = ' + part2 + '\n'
+            output += indentation + ' ' + part1 + ' = ' + part2 + '\n'
             skip = len(values) + 1
-        elif '#-SSA-ListComp' in line or '#-SSA-SetComp' or '#-SSA-DictComp' in line:
+        elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line or '#-SSA-DictComp' in line:
             variable = lines[i + 1].split('=')[0].strip()
             j = 2
             out = ''

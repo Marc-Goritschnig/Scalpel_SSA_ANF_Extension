@@ -497,15 +497,17 @@ def preprocess_py_code(code):
                 if not 'ssa' in node.target.id:
                     lines = code.split('\n')
                     line = lines[node.lineno - 1]
-                    buffer_var = get_buffer_var()
-                    if len(lines[node.lineno - 1]) == (node.end_col_offset - node.col_offset):
-                        lines[node.lineno - 1] = ''
-                    else:
-                        lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
+                    #buffer_var = get_buffer_var()
+                    #if len(lines[node.lineno - 1]) == (node.end_col_offset - node.col_offset):
+                    #    lines[node.lineno - 1] = ''
+                    #else:
+                    #    lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
 
+                    lines[node.lineno - 1] = line[:node.col_offset] + ' ' + node.target.id + ' ' + line[node.end_col_offset:]
                     new_lines = []
                     indentation = len(re.findall(r"^ *", line)[0])
-                    new_lines.append(indentation * ' ' + '(' + buffer_var + ':=' + ast.unparse(node.value) + ')')
+                    new_lines.append(indentation * ' ' + '#-SSA-NamedExpr')
+                    new_lines.append(indentation * ' ' + node.target.id + ' = ' + ast.unparse(node.value))
                     lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                     code = '\n'.join(lines)
                     replaced = True
