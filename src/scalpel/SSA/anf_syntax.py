@@ -101,7 +101,7 @@ class ANFNode:
 
     def enable_print_ascii(self):
         global font
-        font = {'lambda_sign': 'lambda '}
+        font = {'lambda_sign': 'lambda'}
 
     def enable_print_code(self):
         global font
@@ -177,7 +177,9 @@ class ANF_E_APP(ANF_E):
         if out is None:
             # Default output if nothing applies
             out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]) + ')'
-        return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, out)
+        lines = postprocessing_ANF_V_to_python(self, out).split('\n')
+        lines = [get_indentation(lvl) + s for s in lines]
+        return '\n'.join(lines)
 
 class ANF_E_COMM(ANF_E):
     def __init__(self, text: str, term: ANF_E):
@@ -218,7 +220,9 @@ class ANF_E_LET(ANF_E):
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         name = self.var.name
         if name == '_':
-            return get_indentation(lvl) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            lines = self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names).split('\n')
+            lines = [get_indentation(lvl) + s for s in lines]
+            return '\n'.join(lines) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         elif name.startswith('_buffer_'):
             assignments[name] = self.term1
             return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
@@ -249,15 +253,6 @@ class ANF_E_LETREC(ANF_E):
             return 'letrec;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
-
-        ## Check if was For loop
-        #if self.var.name == 'L1': #  re.match('L[0-9]*]', self.var.name):
-        #    ass_iter = self.term1
-        #    iter = ass_iter.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0)
-        #    ass_i = self.term2
-        #    i_var = ass_i.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0)
-        #    return 'for ' + i_var + ' in ' + iter
-
         if re.match(block_label_regex, self.var.name):
             assignments[self.var.name] = self.term1.term
             out = self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
@@ -431,6 +426,7 @@ class ANF_V_UNIT(ANF_V):
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return ''
 
+
 class ANF_V_FUNC(ANF_V):
     def __init__(self, input_var: ANF_V, term: ANF_EV):
         super().__init__()
@@ -438,20 +434,22 @@ class ANF_V_FUNC(ANF_V):
         self.term: ANF_EV = term
 
     def print(self, lvl = 0, prov_info: str = ''):
+        next_node = get_first_node_diff_than_comment(self.term)
         if self.input_var is None:
-            if issubclass(type(self.term), ANF_V):
+            if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
                 return f"{font['lambda_sign']} . {self.term.print(lvl)}"
             return f"{font['lambda_sign']} . \n{self.term.print(lvl)}"
-        if issubclass(type(self.term), ANF_V):
-            return f"{font['lambda_sign']}{self.input_var.print(0)} . {self.term.print(lvl)}"
-        return f"{font['lambda_sign']}{self.input_var.print(0)} . \n{self.term.print(lvl)}"
+        if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
+            return f"{font['lambda_sign']} {self.input_var.print(0)} . {self.term.print(lvl)}"
+        return f"{font['lambda_sign']} {self.input_var.print(0)} . \n{self.term.print(lvl)}"
 
     def get_prov_info(self, prov_info):
+        next_node = get_first_node_diff_than_comment(self.term)
         if self.input_var is None:
-            if issubclass(type(self.term), ANF_V):
+            if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
                 return 'lambda;.;' + self.term.get_prov_info(None)
             return 'lambda;.\n' + self.term.get_prov_info(None)
-        if issubclass(type(self.term), ANF_V):
+        if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
             return 'lambda;' + self.input_var.get_prov_info(None) + ';.;' + self.term.get_prov_info(None)
         return 'lambda;' + self.input_var.get_prov_info(None) + ';.\n' + self.term.get_prov_info(None)
 
@@ -464,6 +462,12 @@ class ANF_V_FUNC(ANF_V):
             return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         vars += [self.input_var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)]
         return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+
+
+def get_first_node_diff_than_comment(node):
+    if isinstance(node, ANF_E_COMM):
+        return get_first_node_diff_than_comment(node.term)
+    return node
 
 
 def get_indentation(nesting_lvl):
@@ -720,9 +724,12 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
     idx = 0
     comment_offset = 0
     for i, w in enumerate(code_words):
-        if len(info_words[i + comment_offset]) > 0:
-            if info_words[i + comment_offset][0] == '#':
-                comment_offset += 1
+        if info_words[i + comment_offset][0] == '#':
+            while True:
+                if info_words[i + comment_offset].startswith('#'):
+                    comment_offset += 1
+                    continue
+                break
         if w in open_keys:
             indentation += 1
         elif w in close_keys:
@@ -890,18 +897,17 @@ def post_processing_anf_to_python(code):
             skip = 1
         elif '#-SSA-Tuple' in line:
             indentation = len(re.findall(r"^ *", lines[i + 1])[0])
-            var, values = re.sub(r'^ *(.*)\s=\s\((.*)\)', r'\1;\2', lines[i + 1]).split(';')
-            values = values.split(',')
+            var, value = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2', lines[i + 1]).split(';')
             j = 2
             vars = []
-            for v in values:
+            while (var + '[') in lines[i + j]:
                 vars.append(lines[i + j].split(' = ')[0].strip())
                 j += 1
             parenthesis = line_strip.split('#-SSA-Tuple')[1]
             part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
-            part2 = '(' + ', '.join(values) + ')' if parenthesis[1] == '1' else ', '.join(values)
-            output += indentation + ' ' + part1 + ' = ' + part2 + '\n'
-            skip = len(values) + 1
+            part2 = '(' + value + ')' if parenthesis[1] == '1' else value
+            output += indentation * ' ' + part1 + ' = ' + part2 + '\n'
+            skip = len(vars) + 1
         elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line or '#-SSA-DictComp' in line:
             variable = lines[i + 1].split('=')[0].strip()
             j = 2

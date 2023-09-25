@@ -50,11 +50,12 @@ def transform():
         with open(python_code_path, 'r') as file:
             py_code = file.read()
 
-    # print(ast.unparse(ast.parse(py_code)))
+    # Reformat the code
+    py_code = ast.unparse(ast.parse(py_code))
 
     # Create a SSA AST from python code
     ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
-    ssa_ast.enable_print_ascii()
+    # ssa_ast.enable_print_ascii()
     if debug_mode:
         print("Transformed SSA tree printed:")
         print(trim_double_spaces(ssa_ast.print(0)))
@@ -77,20 +78,22 @@ def transform():
         print('\n\n\n')
 
     # Print parsed SSA and ANF code to output files
-    with open(output_folder + '/' + ssa_file, 'w') as f:
+    with open(output_folder + '/' + ssa_file, 'w', encoding="utf-8") as f:
         f.write(ssa_ast.print(0))
-    with open(output_folder + '/' + anf_file, 'w') as f:
+    with open(output_folder + '/' + anf_file, 'w', encoding="utf-8") as f:
         f.write(anf_ast.print(0))
-    with open(output_folder + '/' + anf_with_prov_file, 'w') as f:
+    with open(output_folder + '/' + anf_with_prov_file, 'w', encoding="utf-8") as f:
         f.write(print_anf_with_prov_info(anf_ast))
 
     if parse_back:
-        # Parsing the anf code back to internal representation of anf
-        parsed = parse_anf_from_text(print_anf_with_prov_info(anf_ast))
-        if debug_mode:
-            print('Parsed anf tree printed:')
-            print(parsed.print(0))
-            print('\n\n\n')
+
+        with open(output_folder + '/' + anf_with_prov_file, 'r', encoding="utf-8") as f:
+            # Parsing the anf code back to internal representation of anf
+            parsed = parse_anf_from_text(f.read())
+            if debug_mode:
+                print('Parsed anf tree printed:')
+                print(parsed.print(0))
+                print('\n\n\n')
 
         # Parsing the anf code back to Python
         anf_to_python = parsed.parse_anf_to_python({}, [], [])

@@ -579,6 +579,15 @@ def preprocess_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
+            elif node.__class__.__name__ == 'List':
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                if re.match(r'^( *)\[(.*)\] = (.*)', line):
+                    start, vars, value = re.sub(r'^( *)\[(.*)\] = (.*)', r'\1;\2;\3', line).split(';')
+                    lines[node.lineno - 1] = start + '(' + vars + ') = ' + value
+                    code = '\n'.join(lines)
+                    replaced = True
+                    break
             elif isinstance(node, ast.SetComp):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]

@@ -3,4 +3,3 @@ def parse(s):
     assert len(s) == 1
   else:
     assert s[1] == "b"
-

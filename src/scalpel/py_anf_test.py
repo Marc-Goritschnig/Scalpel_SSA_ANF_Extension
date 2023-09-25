@@ -1,3 +1,4 @@
+import ast_comments as ast
 import io
 import os
 import sys
@@ -26,4 +27,6 @@ def test_back_transformation(filename: str):
         sys.stdout = captured_output  # and redirect stdout.
         test_link(f, True)  # Call unchanged function.
         sys.stdout = sys.__stdout__
-        assert(captured_output.getvalue() == file.read())
+        wanted = file.read()  # ast.unparse(ast.parse(file.read())) + '\n'
+
+        assert(captured_output.getvalue() == wanted)
