@@ -8,14 +8,15 @@ import re
 
 font = {'lambda_sign': 'λ'}
 debug_mode = False
-comment_separator = '$'
+comment_separator = '--'
 
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
 function_mapping_ext = {
     re.compile(r'^_new_list_([0-9])+$'): '[%s]',
     re.compile(r'^_Delete_([0-9])+$'): 'del %s',
     re.compile(r'^_new_tuple_([0-9])+$'): '(%s)',
-    re.compile(r'^_new_set_([0-9])+$'): 'set(%s)'
+    re.compile(r'^_new_set_([0-9])+$'): 'set(%s)',
+    re.compile(r'^_new_dict_([0-9])+$'): lambda params : '{' + ','.join([str(p) if i % 2 == 0 else (': ' + str(p)) for i, p in enumerate(params)]).replace(',:', ':') + '}'
 }
  #_Raise_ _Assert _Pass _Break _Continue _new_tuple_ _new_dict_ _new_set_ _new_list_ _List_Slice(LUS) _LSD_Get _str_format3 _ADD
 function_mapping = {
@@ -171,7 +172,10 @@ class ANF_E_APP(ANF_E):
                 out = (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
             for (pattern, value) in function_mapping_ext.items():
                 if pattern.match(self.name.name):
-                    out = (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+                    if callable(value):
+                        out = value([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params])
+                    else:
+                        out = (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
             if re.match('L([0-9]|_)*', self.name.name):
                 out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)
         if out is None:
@@ -940,6 +944,10 @@ def post_processing_anf_to_python(code):
             while i + j < len(lines):
                 lines[i + j] = re.sub(name + '([^\w_0-9]+|$)+', 'lambda ' + args + ': ' + code, lines[i + j])
                 j += 1
+            skip = 1
+        elif line_strip.startswith('#-SSA-SubscriptSet'):
+            indentation, var, subscript, value = re.sub(r'^( *)(.*) = .*\((.*),(.*),(.*)\).*', r'\1;\2;\4;\5', lines[i + 1]).split(';')
+            output += indentation + var + '[' + subscript + '] = ' + value + '\n'
             skip = 1
         elif line_strip.startswith('#-SSA-AnnAssign'):
             indentation = len(re.findall(r"^ *", lines[i + 1])[0])

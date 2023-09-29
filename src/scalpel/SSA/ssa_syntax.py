@@ -663,6 +663,22 @@ def preprocess_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
+            elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Subscript):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+
+                indentation = len(re.findall(r"^ *", line)[0])
+                var = node.targets[0].value.id
+                slice = node.targets[0].slice
+                value = node.value
+
+                lines[node.lineno - 1] = (indentation * ' ') + var + ' = ' + 'dict_det(' + var + ',' + ast.unparse(slice) + ',' + ast.unparse(value) + ')'
+
+                new_code = (indentation * ' ') + '#-SSA-SubscriptSet'
+                lines.insert(node.lineno - 1, new_code)
+                code = '\n'.join(lines)
+                replaced = True
+                break
 
     return code
 
