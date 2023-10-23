@@ -492,6 +492,15 @@ def preprocess_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
+            elif isinstance(node, ast.Import) or isinstance(node, ast.ImportFrom):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                indentation = len(re.findall(r"^ *", line)[0])
+                lines[node.lineno - 1] = '# ' + lines[node.lineno - 1]
+                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-Import')
+                code = '\n'.join(lines)
+                replaced = True
+                break
             elif isinstance(node, ast.Lambda):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]

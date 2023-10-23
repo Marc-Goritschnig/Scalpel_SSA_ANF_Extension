@@ -869,6 +869,9 @@ def post_processing_anf_to_python(code):
                 lines[i + j] = lines[i + j][2:]
                 j += 1
             lines[i + j] = ''
+        elif '#-SSA-Import' in line:
+            lines[i + 1] = lines[i + 1][2:]
+            lines[i] = ''
         elif '_str_format' in line_strip:
             v3 = None
             if '_str_format2' in line_strip:
