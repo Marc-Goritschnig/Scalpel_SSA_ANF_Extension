@@ -30,7 +30,7 @@ debug_mode = True
 print_CFG_graph = False
 parse_back = False
 only_parse_back = False
-
+output_syntax = 0
 
 def transform():
     # Print cfg into file
@@ -59,7 +59,8 @@ def transform():
 
         # Create a SSA AST from python code
         ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
-        # ssa_ast.enable_print_ascii()
+        if output_syntax == 0:
+            ssa_ast.enable_print_ascii()
         if debug_mode:
             print("Transformed SSA tree printed:")
             print(trim_double_spaces(ssa_ast.print(0)))
@@ -67,7 +68,8 @@ def transform():
 
         # Create an ANF AST from SSA AST
         anf_ast = parse_ssa_to_anf(ssa_ast, debug_mode)
-        anf_ast.enable_print_ascii()
+        if output_syntax == 0:
+            anf_ast.enable_print_ascii()
 
         if debug_mode:
             print("Transformed AST tree printed:")
@@ -191,6 +193,7 @@ if __name__ == '__main__':
     parser.add_argument("--save_cfg", '--cfg', default=False, type=str2bool, help="Saves the generated CFG in DOT format")
     parser.add_argument("--parse_back", '--back', default=False, type=str2bool, help="When True the transformation back will be done")
     parser.add_argument("--only_parse_back", default=False, type=str2bool, help="When True the input file will be interpreted as ANF code with annotations and parsed back into Python code")
+    parser.add_argument("--output_syntax", default=0, type=int, help="The format in which the output is printed (0...ascii, 1...code)")
 
     args = parser.parse_args()
 
@@ -203,6 +206,7 @@ if __name__ == '__main__':
     print_CFG_graph = str2bool(args.save_cfg)
     parse_back = str2bool(args.parse_back)
     only_parse_back = str2bool(args.only_parse_back)
+    output_syntax = args.output_syntax
 
     if print_CFG_graph:
         from staticfg import CFGBuilder

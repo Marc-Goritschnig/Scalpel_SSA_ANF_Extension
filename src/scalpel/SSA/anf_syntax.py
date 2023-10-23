@@ -76,7 +76,7 @@ buffer_assignments = {}
 buffer_variable_counter = 0
 
 # Keywords to be ignored when parsing ANF code due to special handling
-keywords = ['let', 'letrec', 'lambda', 'unit', 'if', 'then', 'else', 'in']
+keywords = ['let', 'letrec', 'lambda', 'λ', 'unit', 'if', 'then', 'else', 'in']
 
 
 block_label_regex = r'^L([0-9]|_)*$'
@@ -679,7 +679,7 @@ def parse_anf_e_from_code(code_words, info_words):
         return ANF_E_LETREC(variable, right, _in)
     if next_word == 'unit':
         return ANF_V_UNIT()
-    if next_word == 'lambda':
+    if next_word == 'lambda' or next_word == 'λ':
         variable = ANF_V_VAR(code_words[1])
         rest = code_words[3:]
         rest_info = info_words[3:]
