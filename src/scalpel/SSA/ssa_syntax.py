@@ -475,6 +475,7 @@ def preprocess_py_code(code):
         if debug_mode:
             print("Preprocessing code version:")
             print(code)
+            print('')
         tree = ast.parse(code)
         replaced = False
         for node in ast.walk(tree):
@@ -533,13 +534,14 @@ def preprocess_py_code(code):
 
                 new_lines = []
                 indentation = len(re.findall(r"^ *", line)[0])
+                starting_indentation = indentation
                 new_lines.append(indentation * ' ' + buffer_var + ' = []')
                 for g in node.generators:
                     new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '[' +ast.unparse(node.key) + '] = ' + ast.unparse(node.value))
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
-                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-CompComp')
+                lines.insert(node.lineno - 1, starting_indentation * ' ' + '#-SSA-DictComp')
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -672,9 +674,35 @@ def preprocess_py_code(code):
                 slice = node.targets[0].slice
                 value = node.value
 
-                lines[node.lineno - 1] = (indentation * ' ') + var + ' = ' + 'dict_det(' + var + ',' + ast.unparse(slice) + ',' + ast.unparse(value) + ')'
+                lines[node.lineno - 1] = (indentation * ' ') + var + ' = ' + 'dict_get(' + var + ',' + ast.unparse(slice) + ',' + ast.unparse(value) + ')'
 
                 new_code = (indentation * ' ') + '#-SSA-SubscriptSet'
+                lines.insert(node.lineno - 1, new_code)
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.Call):
+                pass
+            elif isinstance(node, ast.Attribute):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+
+                buffer_var = get_buffer_var()
+                indentation = len(re.findall(r"^ *", line)[0])
+                attr = node.attr
+                var = ast.unparse(node.value)
+
+                params = ''
+                fun_name = '_obj_'
+                if lines[node.lineno - 1][node.end_col_offset:].startswith('('):
+                    params = lines[node.lineno - 1][node.end_col_offset+1:].split(')')[0]
+                    lines[node.lineno - 1] = line.replace(var + '.' + attr + '(' + params + ')', buffer_var)
+                    params = ', ' + params if len(params) > 0 else ''
+                    fun_name = '_obj2_'
+                else:
+                    lines[node.lineno - 1] = line.replace(var + '.' + attr, buffer_var)
+
+                new_code = (indentation * ' ') + '#-SSA-Attribute\n' + (indentation * ' ') + buffer_var + ' = ' + fun_name + attr + '(' + var + params + ')'
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True

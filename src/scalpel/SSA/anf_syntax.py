@@ -15,7 +15,7 @@ function_mapping_ext = {
     re.compile(r'^_new_list_([0-9])+$'): '[%s]',
     re.compile(r'^_Delete_([0-9])+$'): 'del %s',
     re.compile(r'^_new_tuple_([0-9])+$'): '(%s)',
-    re.compile(r'^_new_set_([0-9])+$'): 'set(%s)',
+    re.compile(r'^_new_set_([0-9])+$'): '{%s}',
     re.compile(r'^_new_dict_([0-9])+$'): lambda params : '{' + ','.join([str(p) if i % 2 == 0 else (': ' + str(p)) for i, p in enumerate(params)]).replace(',:', ':') + '}'
 }
  #_Raise_ _Assert _Pass _Break _Continue _new_tuple_ _new_dict_ _new_set_ _new_list_ _List_Slice(LUS) _LSD_Get _str_format3 _ADD
@@ -412,7 +412,7 @@ class ANF_V_VAR(ANF_V):
 
 def normalize_name(name: str):
     idx = name.rfind('_')
-    if idx == -1:
+    if not (re.match(r'.*_([0-9])+', name)) or idx == -1:
         idx = len(name)
     return name[0:idx]
 
@@ -922,7 +922,7 @@ def post_processing_anf_to_python(code):
                 j += 1
 
             if '#-SSA-DictComp' in line:
-                value = re.sub(r'^ *.*\[(.*)\] = (.*)', r'\1\2', lines[i + j]).strip().split(';')
+                value = re.sub(r'^ *.*\[(.*)\] = (.*)', r'\1;\2', lines[i + j]).strip().split(';')
                 value = value[0] + ': ' + value[1]
             else:
                 value = re.sub(r'^ *.*\(' + variable + ',(.*)\).*', r'\1', lines[i + j]).strip()
@@ -999,6 +999,15 @@ def post_processing_anf_to_python(code):
 
             lines = [line] + else_block + code_after
             return output + post_processing_anf_to_python('\n'.join(lines))
+        elif line_strip.startswith('#-SSA-Attribute'):
+            indentation, buffer, type, attr, var = re.sub(r'^( *)(.*) = _obj(2|)_(.*)\((.*)\)', r'\1;\2;\3;\4;\5', lines[i + 1]).split(';')
+            params = ''
+            if ',' in var:
+                var, params = var.split(',', 1)
+            lines[i + 2] = lines[i + 2].replace(buffer, var + '.' + attr)
+            if type == '2':
+                lines[i + 2] = lines[i + 2].replace(var + '.' + attr, var + '.' + attr + '(' + params + ')')
+            return output + post_processing_anf_to_python('\n'.join(lines[i + 2:]))
         else:
             output += line + '\n'
     return output
