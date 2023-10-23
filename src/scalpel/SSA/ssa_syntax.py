@@ -557,7 +557,7 @@ def preprocess_py_code(code):
                 new_lines = []
                 indentation = len(re.findall(r"^ *", line)[0])
                 starting_indentation = indentation
-                new_lines.append(indentation * ' ' + buffer_var + ' = []')
+                new_lines.append(indentation * ' ' + buffer_var + ' = {}')
                 for g in node.generators:
                     new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
                     indentation += 4
@@ -603,49 +603,15 @@ def preprocess_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
-            elif node.__class__.__name__ == 'List':
-                lines = code.split('\n')
-                line = lines[node.lineno - 1]
-                if re.match(r'^( *)\[(.*)\] = (.*)', line):
-                    start, vars, value = re.sub(r'^( *)\[(.*)\] = (.*)', r'\1;\2;\3', line).split(';')
-                    lines[node.lineno - 1] = start + '(' + vars + ') = ' + value
-                    code = '\n'.join(lines)
-                    replaced = True
-                    break
-            elif isinstance(node, ast.SetComp):
-                lines = code.split('\n')
-                line = lines[node.lineno - 1]
-                buffer_var = get_buffer_var()
-                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
-
-                new_lines = []
-                indentation = len(re.findall(r"^ *", line)[0])
-                new_lines.append(indentation * ' ' + buffer_var + ' = {}')
-                for g in node.generators:
-                    new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
-                    indentation += 4
-                new_lines.append(indentation * ' ' + buffer_var + '._set_add(' + ast.unparse(node.elt) + ')')
-                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
-                code = '\n'.join(lines)
-                replaced = True
-                break
-            elif isinstance(node, ast.DictComp):
-                lines = code.split('\n')
-                line = lines[node.lineno - 1]
-                buffer_var = get_buffer_var()
-                lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
-
-                new_lines = []
-                indentation = len(re.findall(r"^ *", line)[0])
-                new_lines.append(indentation * ' ' + buffer_var + ' = {}')
-                for g in node.generators:
-                    new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
-                    indentation += 4
-                new_lines.append(indentation * ' ' + buffer_var + '[' + ast.unparse(node.key) + '] = ' + ast.unparse(node.value))
-                lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
-                code = '\n'.join(lines)
-                replaced = True
-                break
+            #elif node.__class__.__name__ == 'List':
+            #    lines = code.split('\n')
+            #    line = lines[node.lineno - 1]
+            #    if re.match(r'^( *)\[(.*)\] = (.*)', line):
+            #        start, vars, value = re.sub(r'^( *)\[(.*)\] = (.*)', r'\1;\2;\3', line).split(';')
+            #        lines[node.lineno - 1] = start + '(' + vars + ') = ' + value
+            #        code = '\n'.join(lines)
+            #        replaced = True
+            #        break
             elif isinstance(node, ast.AugAssign):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
@@ -696,7 +662,7 @@ def preprocess_py_code(code):
                 slice = node.targets[0].slice
                 value = node.value
 
-                lines[node.lineno - 1] = (indentation * ' ') + var + ' = ' + 'dict_get(' + var + ',' + ast.unparse(slice) + ',' + ast.unparse(value) + ')'
+                lines[node.lineno - 1] = (indentation * ' ') + var + ' = ' + 'dict_set(' + var + ',' + ast.unparse(slice) + ',' + ast.unparse(value) + ')'
 
                 new_code = (indentation * ' ') + '#-SSA-SubscriptSet'
                 lines.insert(node.lineno - 1, new_code)

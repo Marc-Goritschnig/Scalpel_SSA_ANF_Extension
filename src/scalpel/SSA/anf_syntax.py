@@ -219,7 +219,7 @@ class ANF_E_LET(ANF_E):
         return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return 'let;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + ';in\n' + self.term2.get_prov_info(None)
+        return ';' + self.var.get_prov_info(None) + ';;' + self.term1.get_prov_info(None) + ';\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         name = self.var.name
@@ -252,9 +252,9 @@ class ANF_E_LETREC(ANF_E):
 
     def get_prov_info(self, prov_info):
         if isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET):
-            return 'letrec;' + self.var.get_prov_info(None) + ';=\n' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
+            return ';' + self.var.get_prov_info(None) + ';\n' + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
         else:
-            return 'letrec;' + self.var.get_prov_info(None) + ';=;' + self.term1.get_prov_info(None) + '\nin\n' + self.term2.get_prov_info(None)
+            return ';' + self.var.get_prov_info(None) + ';;' + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if re.match(block_label_regex, self.var.name):
@@ -305,7 +305,7 @@ class ANF_E_IF(ANF_E):
         return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return 'if;' + self.test.get_prov_info(None) + ';then\n' + self.term_if.get_prov_info(None) + '\nelse\n' + self.term_else.get_prov_info(None)
+        return ';' + self.test.get_prov_info(None) + ';\n' + self.term_if.get_prov_info(None) + '\n\n' + self.term_else.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         parsed_blocks_buffer = parsed_blocks.copy()
@@ -451,11 +451,11 @@ class ANF_V_FUNC(ANF_V):
         next_node = get_first_node_diff_than_comment(self.term)
         if self.input_var is None:
             if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
-                return 'lambda;.;' + self.term.get_prov_info(None)
-            return 'lambda;.\n' + self.term.get_prov_info(None)
+                return ';;' + self.term.get_prov_info(None)
+            return ';\n' + self.term.get_prov_info(None)
         if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
-            return 'lambda;' + self.input_var.get_prov_info(None) + ';.;' + self.term.get_prov_info(None)
-        return 'lambda;' + self.input_var.get_prov_info(None) + ';.\n' + self.term.get_prov_info(None)
+            return ';' + self.input_var.get_prov_info(None) + ';;' + self.term.get_prov_info(None)
+        return ';' + self.input_var.get_prov_info(None) + ';\n' + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0, print_variables=True):
         if not print_variables:
@@ -665,7 +665,7 @@ def parse_anf_e_from_code(code_words, info_words):
     next_word = code_words[0]
 
     # Found a comment within provenance information
-    if info_words[0][0] == '#':
+    if len(info_words[0]) > 0 and info_words[0][0] == '#':
         return ANF_E_COMM(info_words[0], parse_anf_e_from_code(code_words[0:], info_words[1:]))
     if next_word == 'let':
         variable = ANF_V_VAR(code_words[1])
@@ -728,7 +728,8 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
     idx = 0
     comment_offset = 0
     for i, w in enumerate(code_words):
-        if info_words[i + comment_offset][0] == '#':
+        info = info_words[i + comment_offset]
+        if len(info) > 0 and info[0] == '#':
             while True:
                 if info_words[i + comment_offset].startswith('#'):
                     comment_offset += 1
