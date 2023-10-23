@@ -53,6 +53,7 @@ def transform():
     # Reformat the code
     py_code = ast.unparse(ast.parse(py_code))
     print(py_code)
+    asdf = ast.parse(py_code)
 
     # Create a SSA AST from python code
     ssa_ast = PY_to_SSA_AST(py_code, debug_mode)

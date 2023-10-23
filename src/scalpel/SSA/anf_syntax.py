@@ -863,6 +863,12 @@ def post_processing_anf_to_python(code):
         if '#-SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
             skip = 1
+        elif '#-SSA-ClassStart' in line:
+            j = 1
+            while not lines[i + j].startswith('#-SSA-ClassEnd'):
+                lines[i + j] = lines[i + j][2:]
+                j += 1
+            lines[i + j] = ''
         elif '_str_format' in line_strip:
             v3 = None
             if '_str_format2' in line_strip:

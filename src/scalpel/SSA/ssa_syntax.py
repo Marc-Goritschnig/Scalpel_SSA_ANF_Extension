@@ -479,7 +479,20 @@ def preprocess_py_code(code):
         tree = ast.parse(code)
         replaced = False
         for node in ast.walk(tree):
-            if isinstance(node, ast.Lambda):
+            if isinstance(node, ast.ClassDef):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                indentation = len(re.findall(r"^ *", line)[0])
+
+                for i in range(node.lineno - 1, node.end_lineno):
+                    lines[i] = '# ' + lines[i]
+
+                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-ClassStart')
+                lines.insert(node.end_lineno + 1, indentation * ' ' + '#-SSA-ClassEnd')
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.Lambda):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
                 buffer_var = get_buffer_var()
@@ -743,6 +756,9 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
     # Parse all the functions cfgs
     procs = PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
 
+    # Parse all the class cfgs
+    # procs += [PS_FS(prov_info, cfg.class_cfgs, cfg.class_args, m_ssa)]
+
     # Create SSA AST
     ssa_ast = SSA_AST(procs, main_cfg_proc)
 
@@ -784,7 +800,9 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
 
     for key in function_cfgs:
         cfg = function_cfgs[key]
-        args = function_args[key]
+        args = []
+        if key in function_args:
+            args = function_args[key]
 
         # Compute the phi nodes of the current function CFG
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars)
