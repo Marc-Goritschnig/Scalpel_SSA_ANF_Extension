@@ -29,6 +29,7 @@ python_code_path = None
 debug_mode = True
 print_CFG_graph = False
 parse_back = False
+only_parse_back = False
 
 
 def transform():
@@ -50,50 +51,56 @@ def transform():
         with open(python_code_path, 'r') as file:
             py_code = file.read()
 
-    # Reformat the code
-    py_code = ast.unparse(ast.parse(py_code))
+    if only_parse_back:
+        pass
+    else:
+        # Reformat the code
+        py_code = ast.unparse(ast.parse(py_code))
 
-    # Create a SSA AST from python code
-    ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
-    # ssa_ast.enable_print_ascii()
-    if debug_mode:
-        print("Transformed SSA tree printed:")
-        print(trim_double_spaces(ssa_ast.print(0)))
-        print('\n\n\n')
+        # Create a SSA AST from python code
+        ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
+        # ssa_ast.enable_print_ascii()
+        if debug_mode:
+            print("Transformed SSA tree printed:")
+            print(trim_double_spaces(ssa_ast.print(0)))
+            print('\n\n\n')
 
-    # Create an ANF AST from SSA AST
-    anf_ast = parse_ssa_to_anf(ssa_ast, debug_mode)
-    anf_ast.enable_print_ascii()
+        # Create an ANF AST from SSA AST
+        anf_ast = parse_ssa_to_anf(ssa_ast, debug_mode)
+        anf_ast.enable_print_ascii()
 
-    if debug_mode:
-        print("Transformed AST tree printed:")
+        if debug_mode:
+            print("Transformed AST tree printed:")
 
-    if not parse_back:
-        print(trim_double_spaces(anf_ast.print(0)))
+        if not parse_back:
+            print(trim_double_spaces(anf_ast.print(0)))
 
-    if debug_mode:
-        print('\n\n\n')
-        print("Transformed AST tree with provenance printed:")
-        print(trim_double_spaces(print_anf_with_prov_info(anf_ast)))
-        print('\n\n\n')
+        if debug_mode:
+            print('\n\n\n')
+            print("Transformed AST tree with provenance printed:")
+            print(trim_double_spaces(print_anf_with_prov_info(anf_ast)))
+            print('\n\n\n')
 
-    # Print parsed SSA and ANF code to output files
-    with open(output_folder + '/' + ssa_file, 'w', encoding="utf-8") as f:
-        f.write(ssa_ast.print(0))
-    with open(output_folder + '/' + anf_file, 'w', encoding="utf-8") as f:
-        f.write(anf_ast.print(0))
-    with open(output_folder + '/' + anf_with_prov_file, 'w', encoding="utf-8") as f:
-        f.write(print_anf_with_prov_info(anf_ast))
+        # Print parsed SSA and ANF code to output files
+        with open(output_folder + '/' + ssa_file, 'w', encoding="utf-8") as f:
+            f.write(ssa_ast.print(0))
+        with open(output_folder + '/' + anf_file, 'w', encoding="utf-8") as f:
+            f.write(anf_ast.print(0))
+        with open(output_folder + '/' + anf_with_prov_file, 'w', encoding="utf-8") as f:
+            f.write(print_anf_with_prov_info(anf_ast))
 
-    if parse_back:
+    if parse_back or only_parse_back:
 
-        with open(output_folder + '/' + anf_with_prov_file, 'r', encoding="utf-8") as f:
-            # Parsing the anf code back to internal representation of anf
-            parsed = parse_anf_from_text(f.read())
-            if debug_mode:
-                print('Parsed anf tree printed:')
-                print(parsed.print(0))
-                print('\n\n\n')
+        if only_parse_back:
+            parsed = parse_anf_from_text(py_code)
+        else:
+            with open(output_folder + '/' + anf_with_prov_file, 'r', encoding="utf-8") as f:
+                # Parsing the anf code back to internal representation of anf
+                parsed = parse_anf_from_text(f.read())
+                if debug_mode:
+                    print('Parsed anf tree printed:')
+                    print(parsed.print(0))
+                    print('\n\n\n')
 
         # Parsing the anf code back to Python
         anf_to_python = parsed.parse_anf_to_python({}, [], [])
@@ -183,6 +190,7 @@ if __name__ == '__main__':
     parser.add_argument("--debug_mode", '-d', default=False, type=str2bool, help="Shows more information and logs when True")
     parser.add_argument("--save_cfg", '--cfg', default=False, type=str2bool, help="Saves the generated CFG in DOT format")
     parser.add_argument("--parse_back", '--back', default=False, type=str2bool, help="When True the transformation back will be done")
+    parser.add_argument("--only_parse_back", default=False, type=str2bool, help="When True the input file will be interpreted as ANF code with annotations and parsed back into Python code")
 
     args = parser.parse_args()
 
@@ -194,6 +202,7 @@ if __name__ == '__main__':
     debug_mode = str2bool(args.debug_mode)
     print_CFG_graph = str2bool(args.save_cfg)
     parse_back = str2bool(args.parse_back)
+    only_parse_back = str2bool(args.only_parse_back)
 
     if print_CFG_graph:
         from staticfg import CFGBuilder
