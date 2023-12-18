@@ -9,6 +9,7 @@ import re
 font = {'lambda_sign': 'λ'}
 debug_mode = False
 comment_separator = '--'
+buffer_var_name = '%_'
 
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
 function_mapping_ext = {
@@ -227,7 +228,8 @@ class ANF_E_LET(ANF_E):
             lines = self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names).split('\n')
             lines = [get_indentation(lvl) + s for s in lines]
             return '\n'.join(lines) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        elif name.startswith('_buffer_'):
+        #elif self.var.is_buffer_var:
+        elif self.var.is_buffer_var:
             assignments[name] = self.term1
             return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
@@ -362,6 +364,8 @@ class ANF_E_IF(ANF_E):
 class ANF_V(ANF_EV):
     def __init__(self):
         super().__init__()
+        self.is_buffer_var: bool = False
+        self.is_block_id: bool = False
 
     def print(self, lvl = 0, prov_info: str = ''):
         return f""
@@ -393,15 +397,19 @@ def postprocessing_ANF_V_to_python(n: ANFNode, out: str):
     return out
 
 class ANF_V_VAR(ANF_V):
-    def __init__(self, name: str):
+    def __init__(self, name: str, is_buffer_var: bool = False, is_block_id: bool = False):
         super().__init__()
         self.name: str = name
+        self.is_buffer_var: bool = is_buffer_var
+        self.is_block_id: bool = is_block_id
 
     def print(self, lvl = 0, prov_info: str = ''):
         return f"{self.name}"
 
     def get_prov_info(self, prov_info):
-        return 'v' + self.print_prov_ext()
+        if self.is_block_id:
+             return 'id'
+        return ('b' if self.is_buffer_var else '') + 'v' + self.print_prov_ext()
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if self.name in assignments:
@@ -596,12 +604,12 @@ def unwrap_inner_applications_let_structure(var: SSA_V, inner, unwrap_var: bool 
     if isinstance(var, SSA_V_FUNC_CALL):
         if unwrap_var:
             name = buffer_assignments[var]
-            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name), SA_V(var), inner))
+            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name, True), SA_V(var), inner))
         else:
             for arg in var.args:
                 if isinstance(arg, SSA_V_FUNC_CALL):
                     name = buffer_assignments[arg]
-                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name), SA_V(arg), inner))
+                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True), SA_V(arg), inner))
     return inner
 
 
@@ -638,7 +646,7 @@ def SA_V(var: SSA_V, can_be_buffered: bool = False):
 def get_buffer_variable():
     global buffer_variable_counter
     buffer_variable_counter += 1
-    return '_buffer_' + str(buffer_variable_counter - 1)
+    return buffer_var_name + str(buffer_variable_counter - 1)
 
 
 # Print the ANF tree including the provenance information right aligned to the code per line
@@ -668,19 +676,19 @@ def parse_anf_e_from_code(code_words, info_words):
     if len(info_words[0]) > 0 and info_words[0][0] == '#':
         return ANF_E_COMM(info_words[0], parse_anf_e_from_code(code_words[0:], info_words[1:]))
     if next_word == 'let':
-        variable = ANF_V_VAR(code_words[1])
+        variable = ANF_V_VAR(code_words[1], info_words[1] == 'bv')
         right = parse_anf_e_from_code(code_words[3:], info_words[3:])
         _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LET(variable, right, _in)
     if next_word == 'letrec':
-        variable = ANF_V_VAR(code_words[1])
+        variable = ANF_V_VAR(code_words[1], info_words[1] == 'bv')
         right = parse_anf_e_from_code(code_words[3:], info_words[3:])
         _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LETREC(variable, right, _in)
     if next_word == 'unit':
         return ANF_V_UNIT()
     if next_word == 'lambda' or next_word == 'λ':
-        variable = ANF_V_VAR(code_words[1])
+        variable = ANF_V_VAR(code_words[1], info_words[1] == 'bv')
         rest = code_words[3:]
         rest_info = info_words[3:]
         if code_words[1] == '.':
@@ -714,6 +722,10 @@ def parse_anf_v_from_code(code_word: str, info_word_with_prov: str):
         n = ANF_V_CONST(code_word)
     if info_word == 'v':
         n = ANF_V_VAR(code_word)
+    if info_word == 'id':
+        n = ANF_V_VAR(code_word, False, True)
+    if info_word == 'bv':
+        n = ANF_V_VAR(code_word, True)
     if info_word.startswith('f'):
         n = ANF_E_APP([], parse_anf_v_from_code(code_word, info_word[1:]))
     if n is not None and len(info_word_parts) > 1:
@@ -800,10 +812,11 @@ def parse_anf_to_ssa2(term):
     elif isinstance(term, ANF_E_LET):
         name = term.var.print()
         # Parse the right assignment side first and check if the left side is a buffer variable
-        stmts1, _      , _      = parse_anf_to_ssa2(term.term1)
+        stmts1, _, _ = parse_anf_to_ssa2(term.term1)
         ass = [SSA_E_ASS(SSA_V_VAR(name), stmts1[0])]
         # if we have a buffer variable we keep track of it and do not include the assignment in the returned statements
-        if name.startswith('_buffer_'):
+        #if term.var.is_buffer_var:
+        if term.var.is_buffer_var:
             buffer_assignments_anf_ssa[name] = stmts1[0]
             ass = []
         # Parse the following statements
