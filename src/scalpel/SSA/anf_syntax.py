@@ -11,6 +11,7 @@ debug_mode = False
 comment_separator = '--'
 buffer_var_name = '%_'
 
+VAR_NAME_REGEX = '[a-zA-Z0-9_]*'
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
 function_mapping_ext = {
     re.compile(r'^_new_list_([0-9])+$'): '[%s]',
@@ -948,7 +949,7 @@ def post_processing_anf_to_python(code):
                 value = re.sub(r'^ *.*\[(.*)\] = (.*)', r'\1;\2', lines[i + j]).strip().split(';')
                 value = value[0] + ': ' + value[1]
             else:
-                value = re.sub(r'^ *.*\(' + variable + ',(.*)\).*', r'\1', lines[i + j]).strip()
+                value = re.sub(r'^ *' + variable + '\\.' + VAR_NAME_REGEX + '\((.*)\).*', r'\1', lines[i + j]).strip()
 
             out = value + ' ' + out
             if '#-SSA-ListComp' in line:
@@ -1023,7 +1024,7 @@ def post_processing_anf_to_python(code):
             lines = [line] + else_block + code_after
             return output + post_processing_anf_to_python('\n'.join(lines))
         elif line_strip.startswith('#-SSA-Attribute'):
-            indentation, buffer, type, attr, var = re.sub(r'^( *)(.*) = _obj(2|)_(.*)\((.*)\)', r'\1;\2;\3;\4;\5', lines[i + 1]).split(';')
+            indentation, buffer, type, attr, var = re.sub(r'^( *)(.*) = _obj(2|)_(' + VAR_NAME_REGEX + ')\((.*)\)$', r'\1;\2;\3;\4;\5', lines[i + 1]).split(';')
             params = ''
             if ',' in var:
                 var, params = var.split(',', 1)

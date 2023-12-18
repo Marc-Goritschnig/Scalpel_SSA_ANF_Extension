@@ -690,6 +690,10 @@ def preprocess_py_code(code):
                 else:
                     lines[node.lineno - 1] = line.replace(var + '.' + attr, buffer_var)
 
+                #if lines[node.lineno - 1].strip() == buffer_var:
+                #    lines[node.lineno - 1] = ''
+                #    buffer_var = '_'
+
                 new_code = (indentation * ' ') + '#-SSA-Attribute\n' + (indentation * ' ') + buffer_var + ' = ' + fun_name + attr + '(' + var + params + ')'
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
