@@ -10,6 +10,7 @@ font = {'lambda_sign': 'λ'}
 debug_mode = False
 comment_separator = '--'
 buffer_var_name = '%_'
+COMMENT_MARKER = '#'
 
 VAR_NAME_REGEX = '[a-zA-Z0-9_]*'
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
@@ -194,10 +195,10 @@ class ANF_E_COMM(ANF_E):
         self.term: ANF_E = term
 
     def print(self, lvl = 0, prov_info: str = ''):
-        return f"{self.term.print(lvl)}"
+        return get_indentation(lvl) + f"{self.text}\n{self.term.print(lvl)}"
 
     def get_prov_info(self, prov_info):
-        return self.text + ';' + self.term.get_prov_info(None)
+        return '\n' + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         out = self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
@@ -664,7 +665,7 @@ def parse_anf_from_text(code: str):
     lines = code.split('\n')
     code_lines, info_lines = zip(*[tuple(line.split(comment_separator)) for line in lines])
     code_lines = [re.sub(' +', ' ', line) for line in code_lines]
-    code_words = [word if i % 2 == 0 else (('\'' + part + '\'') if j == 0 else None) for line in code_lines for i, part in enumerate(line.strip().split('\'')) for j, word in enumerate(part.strip().split(' '))  if part != ' ']
+    code_words = [word if i % 2 == 0 else (('\'' + part + '\'') if j == 0 else None) for line in code_lines for i, part in enumerate(line.strip().split('\'')) for j, word in enumerate([part] if part.startswith(COMMENT_MARKER) else part.strip().split(' '))  if part != ' ']
     code_words = list(filter(lambda e: e is not None, code_words))
     aa = parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(';')])
     return aa
@@ -674,8 +675,8 @@ def parse_anf_e_from_code(code_words, info_words):
     next_word = code_words[0]
 
     # Found a comment within provenance information
-    if len(info_words[0]) > 0 and info_words[0][0] == '#':
-        return ANF_E_COMM(info_words[0], parse_anf_e_from_code(code_words[0:], info_words[1:]))
+    if len(code_words[0]) > 0 and code_words[0][0] == '#':
+        return ANF_E_COMM(code_words[0], parse_anf_e_from_code(code_words[1:], info_words[1:]))
     if next_word == 'let':
         variable = ANF_V_VAR(code_words[1], info_words[1] == 'bv')
         right = parse_anf_e_from_code(code_words[3:], info_words[3:])
