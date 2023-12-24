@@ -575,13 +575,14 @@ def preprocess_py_code(code):
 
                 new_lines = []
                 indentation = len(re.findall(r"^ *", line)[0])
+                original_indentation = indentation
                 new_lines.append(indentation * ' ' + buffer_var + ' = []')
                 for g in node.generators:
                     new_lines.append(indentation * ' ' + 'for ' + ast.unparse(g.target) + ' in ' + ast.unparse(g.iter) + ':')
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '.append(' + ast.unparse(node.elt) + ')')
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
-                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-ListComp')
+                lines.insert(node.lineno - 1, original_indentation * ' ' + '#-SSA-ListComp')
                 code = '\n'.join(lines)
                 replaced = True
                 break
