@@ -5,7 +5,7 @@ https://github.com/coetaur0/staticfg
 
 import sys
 
-import ast_comments as ast
+import scalpel.ast_comments as ast
 
 from ..core.func_call_visitor import get_func_calls
 from .model import CFG, Block, Link

@@ -2,7 +2,7 @@
 In this module, the single static assignment forms are implemented to allow
 further analysis. The module contain a single class named SSA.
 """
-import ast_comments as ast
+import scalpel.ast_comments as ast
 import astor
 from functools import reduce
 from collections import OrderedDict

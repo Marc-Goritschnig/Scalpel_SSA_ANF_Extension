@@ -3,8 +3,7 @@ import sys
 import re
 import argparse
 
-import ast_comments as ast
-import ast as ast2
+import scalpel.ast_comments as ast
 
 from scalpel.functions import trim_double_spaces
 

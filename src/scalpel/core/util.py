@@ -1,10 +1,8 @@
-import ast_comments as ast
+import scalpel.ast_comments as ast
 import os
 import pkgutil
 import sys
 from _ast import *
-
-import ast_comments
 
 
 def iter_fields(node):

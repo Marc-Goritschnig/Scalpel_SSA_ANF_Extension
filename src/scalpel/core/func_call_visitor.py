@@ -1,4 +1,4 @@
-import ast_comments as ast
+import scalpel.ast_comments as ast
 import sys
 from ast import NodeVisitor
 from collections import deque

@@ -1,10 +1,8 @@
-import ast_comments as ast
 import io
 import os
 import sys
 
 from scalpel.py_anf_transformer import test_link
-
 
 
 def pytest_generate_tests(metafunc):

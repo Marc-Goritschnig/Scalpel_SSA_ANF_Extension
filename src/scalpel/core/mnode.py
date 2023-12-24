@@ -4,7 +4,7 @@ files are fed into this module to generate a frontend object for both parsing
 and code instrumentation. In addition, scope information can also be given for
 fine-grained operations.
 """
-import ast_comments as ast
+import scalpel.ast_comments as ast
 
 from scalpel.core.util import UnitWalker
 

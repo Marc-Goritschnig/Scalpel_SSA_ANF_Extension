@@ -2,7 +2,7 @@
 Control flow graph for Python programs.
 """
 
-import ast_comments as ast
+import scalpel.ast_comments as ast
 import re
 import sys
 import token
