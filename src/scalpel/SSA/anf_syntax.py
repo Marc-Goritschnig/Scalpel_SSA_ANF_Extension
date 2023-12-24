@@ -274,7 +274,7 @@ class ANF_E_LETREC(ANF_E):
                     assignments[self.var.name] = self.term2
                     out = self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl, False)
                     return post_processing_anf_to_python(out)
-        elif isinstance(self.term2, ANF_V_FUNC):
+        elif isinstance(self.term2, ANF_E_FUNC):
             out = get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + '\n' + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
             return post_processing_anf_to_python(out)
 
@@ -285,14 +285,14 @@ class ANF_E_LETREC(ANF_E):
         return post_processing_anf_to_python(out)
 
 def get_function_parameter_recursive(next):
-    if isinstance(next, ANF_V_FUNC):
+    if isinstance(next, ANF_E_FUNC):
         if next.input_var is not None:
             return [next.input_var.print(0, None)] + get_function_parameter_recursive(next.term)
     return []
 
 
 def get_next_non_function_term(next):
-    if isinstance(next, ANF_V_FUNC):
+    if isinstance(next, ANF_E_FUNC):
         return get_next_non_function_term(next.term)
     else:
         return next
@@ -441,11 +441,11 @@ class ANF_V_UNIT(ANF_V):
         return ''
 
 
-class ANF_V_FUNC(ANF_V):
-    def __init__(self, input_var: ANF_V, term: ANF_EV):
+class ANF_E_FUNC(ANF_E):
+    def __init__(self, input_var: ANF_V, term: ANF_E):
         super().__init__()
         self.input_var: ANF_V = input_var
-        self.term: ANF_EV = term
+        self.term: ANF_E = term
 
     def print(self, lvl = 0, prov_info: str = ''):
         next_node = get_first_node_diff_than_comment(self.term)
@@ -525,7 +525,7 @@ def SA_PS(ps: [SSA_P], inner_term):
 
         args = p.args[::-1]
         while len(args) > 0:
-            first_term = ANF_V_FUNC(SA_V(args[0]), first_term)
+            first_term = ANF_E_FUNC(SA_V(args[0]), first_term)
             args = args[1:]
 
         let_rec = ANF_E_LETREC(SA_V(p.name), first_term, inner_term)
@@ -535,7 +535,7 @@ def SA_PS(ps: [SSA_P], inner_term):
 
         args = p.args
         while len(args) > 0:
-            first_term = ANF_V_FUNC(SA_V(args[0]), first_term)
+            first_term = ANF_E_FUNC(SA_V(args[0]), first_term)
             args = args[1:]
 
         let_rec = ANF_E_LETREC(SA_V(p.name), first_term, SA_PS(ps[1:], inner_term))
@@ -552,14 +552,14 @@ def SA_BS(bs: [SSA_B], inner_call):
 
     # Create self containing functions to build lambda functions in each other. leading to have functions with multiple variables
     if len(block_vars) > 0:
-        func = ANF_V_FUNC(block_vars[0], SA_ES(b, b.terms))
+        func = ANF_E_FUNC(block_vars[0], SA_ES(b, b.terms))
         block_vars = block_vars[1:]
 
         while len(block_vars) > 0:
-            func = ANF_V_FUNC(block_vars[0], func)
+            func = ANF_E_FUNC(block_vars[0], func)
             block_vars = block_vars[1:]
     else:
-        func = ANF_V_FUNC(None, SA_ES(b, b.terms))
+        func = ANF_E_FUNC(None, SA_ES(b, b.terms))
 
     if len(bs) == 1:
         let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, inner_call)
@@ -697,7 +697,7 @@ def parse_anf_e_from_code(code_words, info_words):
             variable = None
             rest = code_words[2:]
             rest_info = info_words[2:]
-        return ANF_V_FUNC(variable, parse_anf_e_from_code(rest, rest_info))
+        return ANF_E_FUNC(variable, parse_anf_e_from_code(rest, rest_info))
     if next_word == 'if':
         then_part = get_other_section_part(code_words[1:], info_words[1:], ['if'], ['then'])
         else_part = get_other_section_part(code_words[1:], info_words[1:], ['if'], ['else'])
@@ -849,7 +849,7 @@ def parse_anf_to_ssa2(term):
         if term.name in buffer_assignments_anf_ssa:
             return [buffer_assignments_anf_ssa[term.name]], [], []
         return [SSA_V_VAR(term.name)], [], []
-    elif isinstance(term, ANF_V_FUNC):
+    elif isinstance(term, ANF_E_FUNC):
         return [], [], []
     elif isinstance(term, ANF_V_CONST):
         return [SSA_V_CONST(term.value)], [], []
