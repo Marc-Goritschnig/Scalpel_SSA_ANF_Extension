@@ -664,9 +664,20 @@ def parse_anf_from_text(code: str):
     code = code.strip()
     lines = code.split('\n')
     code_lines, info_lines = zip(*[tuple(line.split(comment_separator)) for line in lines])
-    code_lines = [re.sub(' +', ' ', line) for line in code_lines]
-    code_words = [word if i % 2 == 0 else (('\'' + part + '\'') if j == 0 else None) for line in code_lines for i, part in enumerate(line.strip().split('\'')) for j, word in enumerate([part] if part.startswith(COMMENT_MARKER) else part.strip().split(' '))  if part != ' ']
-    code_words = list(filter(lambda e: e is not None, code_words))
+    code_lines = [line if re.match(r'^(\s)*' + COMMENT_MARKER, line) else re.sub(' +', ' ', line) for line in code_lines]
+    code_words = []
+
+    for line in code_lines:
+        for i, part in enumerate([line.strip()] if re.match(r'^(\s)*' + COMMENT_MARKER, line) else line.strip().split('\'')):
+            if part != ' ':
+                for j, word in enumerate(
+                        [part] if re.match(r'^(\s)*' + COMMENT_MARKER, part) else part.strip().split(' ')):
+                    if i % 2 == 0:
+                        code_words.append(word)
+                    elif j == 0:
+                        code_words.append('\'' + part + '\'')
+
+    # code_words = list(filter(lambda e: e is not None, code_words))
     aa = parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(';')])
     return aa
 
@@ -742,13 +753,6 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
     idx = 0
     comment_offset = 0
     for i, w in enumerate(code_words):
-        info = info_words[i + comment_offset]
-        if len(info) > 0 and info[0] == '#':
-            while True:
-                if info_words[i + comment_offset].startswith('#'):
-                    comment_offset += 1
-                    continue
-                break
         if w in open_keys:
             indentation += 1
         elif w in close_keys:

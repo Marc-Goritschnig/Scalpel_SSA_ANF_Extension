@@ -5,6 +5,9 @@ def trim_double_spaces(text):
     trimmed_lines = []
 
     for line in lines:
+        if re.match(r'^\s*#', line):
+            trimmed_lines.append(line)
+            continue
         leading_spaces = re.match(r'^\s*', line).group()
         trailing_spaces = re.search(r'\s*$', line).group()
 
