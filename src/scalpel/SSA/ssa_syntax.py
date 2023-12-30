@@ -907,7 +907,7 @@ def replace_and_find_returning_loop_block(visited, block, find, replace_block):
 # Parse a Python statement
 def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
-        if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple):
+        if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple) or isinstance(stmt.targets[0], ast.List) or isinstance(stmt.targets[0], ast2.List):
             tuple_name = get_buffer_var()
             post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_V_FUNC_CALL(SSA_V_VAR('tuple_get'), [SSA_V_VAR(tuple_name), SSA_V_CONST(str(idx))])) for idx, var in enumerate(stmt.targets[0].elts)]
             parts = original_code_lines[stmt.lineno - 1].split(' = ')

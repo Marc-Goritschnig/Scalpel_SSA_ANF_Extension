@@ -11,22 +11,22 @@ cd /mnt/c/users/MarcGoritschnig/OneDrive-HTL/Dokumente/Uni/MasterThesis/Scalpel_
 pip install -r requirements.txt
 
 
-###Navigate in Project:
+### Navigate in Project:
 cd C:\Users\MarcGoritschnig\OneDrive-HTL\Dokumente\Uni\MasterThesis\Scalpel_SSA_ANF_Extension
 
-###Venv erzeugen:
+### Venv erzeugen:
 python3 -m venv /mnt/c/users/MarcGoritschnig/venvs/unix_venv_scalpel2
 
-###Activate Venv:
+### Activate Venv:
 . /mnt/c/users/MarcGoritschnig/venvs/unix_venv_scalpel2/bin/activate
 
-###Build:
+### Build:
 cd /mnt/c/users/MarcGoritschnig/OneDrive-HTL/Dokumente/Uni/MasterThesis/Scalpel_SSA_ANF_Extension
 . /mnt/c/users/MarcGoritschnig/venvs/unix_venv_scalpel2/bin/activate
 PyInstaller --noconfirm --onefile --console  "/mnt/c/Users/MarcGoritschnig/OneDrive-HTL/Dokumente/Uni/MasterThesis/Scalpel_SSA_ANF_Extension/src/scalpel/py_anf_transformer.py"
 
 
-###Mac:
+### Mac:
 pyinstaller --noconfirm --onefile --console  "/Users/proagent/IdeaProjects/Scalpel_SSA_ANF_Extension/src/scalpel/py_anf_transformer.py"
 pyinstaller --noconfirm --onefile --console --target-arch x86_64 "/Users/proagent/IdeaProjects/Scalpel_SSA_ANF_Extension/src/scalpel/py_anf_transformer.py"
 pyinstaller --noconfirm --onefile --console --target-arch arm64 "/Users/proagent/IdeaProjects/Scalpel_SSA_ANF_Extension/src/scalpel/py_anf_transformer.py"
