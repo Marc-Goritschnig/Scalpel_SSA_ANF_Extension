@@ -11,6 +11,8 @@ debug_mode = True
 font = {'assign': '←',
         'phi': 'φ'}
 
+buffer_var_name = '_SSA_'
+
 operator_map = {
     ast.Add: '+',
     ast.Sub: '-',
@@ -40,7 +42,6 @@ original_code_lines = []
 used_var_names = {}
 
 # Prefix for new variables from the transformation
-buffer_var_name = "_ssa_"
 buffer_counter = 0  # Index for new buffer variables (postfix)
 
 # Mapping dict of nodes to their new buffer variable name to be replaced with when occurring in the translation
@@ -476,6 +477,7 @@ def preprocess_py_code(code):
             print("Preprocessing code version:")
             print(code)
             print('')
+        code = code.replace('%_', 'temp_ssa_parsing_buffer_')
         tree = ast.parse(code)
         replaced = False
         for node in ast.walk(tree):
@@ -511,6 +513,9 @@ def preprocess_py_code(code):
                 indentation = len(re.findall(r"^ *", line)[0])
                 new_lines.append(indentation * ' ' + 'def ' + buffer_var + '(' + ast.unparse(node.args) + '):')
                 indentation += 4
+                # For a lambda the comment is placed after the first responsible code line
+                # because a function will be parsed into a proc and no code is written in front of the proc
+                new_lines.append(indentation * ' ' + '#-SSA-Lambda')
                 new_lines += [(' ' * indentation + body_l) for body_l in ('return ' + ast.unparse(node.body)).split('\n')]
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
@@ -701,6 +706,7 @@ def preprocess_py_code(code):
                 replaced = True
                 break
 
+    code = code.replace('temp_ssa_parsing_buffer_', '%_')
     return code
 
 

@@ -98,6 +98,7 @@ def transform():
             with open(output_folder + '/' + anf_with_prov_file, 'r', encoding="utf-8") as f:
                 # Parsing the anf code back to internal representation of anf
                 parsed = parse_anf_from_text(f.read())
+
                 if debug_mode:
                     print('Parsed anf tree printed:')
                     print(parsed.print(0))

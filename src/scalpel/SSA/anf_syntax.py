@@ -3,14 +3,19 @@ from __future__ import annotations
 import ast
 
 from scalpel.SSA.ssa_syntax import *
+# from scalpel.SSA.ssa_syntax import buffer_var_name
 
 import re
 
 font = {'lambda_sign': 'λ'}
 debug_mode = False
 comment_separator = '--'
-buffer_var_name = '%_'
 COMMENT_MARKER = '#'
+buffer_var_name = '%_'
+PROV_INFO_EXT_CHAR = '|'
+
+# Prefix of block labels from SSA
+block_identifier = 'L'
 
 VAR_NAME_REGEX = '[a-zA-Z0-9_]*'
 block_call_pattern = re.compile(r'^L([0-9])+(.)*')
@@ -71,8 +76,6 @@ function_mapping = {
 # Global reference of the SSA AST to be transformed
 ssa_ast_global: SSA_AST = None
 
-# Prefix of block labels from SSA
-block_identifier = 'L'
 
 # Buffer variables mapped to ANF nodes to replace more complex code due to only values being allowed to be used in function calls
 buffer_assignments = {}
@@ -120,7 +123,7 @@ class ANFNode:
     def print_prov_ext(self):
         prov = ''
         if self.prov_info != '':
-            prov = '|' + self.prov_info
+            prov = PROV_INFO_EXT_CHAR  + self.prov_info
         return prov
 
 class ANF_EV(ANFNode):
@@ -964,9 +967,11 @@ def post_processing_anf_to_python(code):
 
             output += lines[i + j + 1].replace(variable, out)
             skip = j + 1
-        elif re.match('def (_ssa_)[0-9]*\(.*', line_strip):
-            name, args = re.sub(r'def (_ssa_.*)\((.*)\).*', r'\1;\2', lines[i]).split(';')
+        elif '#-SSA-Lambda' in line and 'def ' in lines[i - 1]:
+            name, args = re.sub(r'def (.*)\((.*)\).*', r'\1;\2', lines[i - 1]).split(';')
             code = lines[i + 1]
+            output = ''.join(output.split('\n')[:-2])
+            lines[i - 1] = ''
             lines[i] = ''
             lines[i + 1] = ''
             j = 2
