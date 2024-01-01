@@ -252,20 +252,18 @@ class ANF_E_LETREC(ANF_E):
 
     def print(self, lvl=0, prov_info: str = ''):
         # assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
-        if isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET):
-            return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + '\n' + self.term1.print(lvl + 1) + '\n' + get_indentation(lvl) + 'in\n' + self.term2.print(lvl + 1)
-        else:
-            return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + self.term1.print(lvl + 1) + '\n' + get_indentation(lvl) + 'in\n' + self.term2.print(lvl + 1)
+        add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
+        line_sep = '\n' if add_new_line else ''
+        return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + line_sep + self.term1.print(lvl + 1) + '\n' + get_indentation(lvl) + 'in\n' + self.term2.print(lvl + 1)
 
     def get_prov_info(self, prov_info):
-        if isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET):
-            return ';' + self.var.get_prov_info(None) + ';\n' + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
-        else:
-            return ';' + self.var.get_prov_info(None) + ';;' + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
+        add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
+        line_sep = '\n' if add_new_line else ';'
+        return ';' + self.var.get_prov_info(None) + ';' + line_sep + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if re.match(block_label_regex, self.var.name):
-            assignments[self.var.name] = self.term1.term
+            assignments[self.var.name] = self.term1.term if isinstance(self.term1, ANF_E_FUNC) else self.term1
             out = self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
             return post_processing_anf_to_python(out)
 
@@ -452,23 +450,19 @@ class ANF_E_FUNC(ANF_E):
 
     def print(self, lvl = 0, prov_info: str = ''):
         next_node = get_first_node_diff_than_comment(self.term)
+        add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(self.term, ANF_E_COMM)
+        line_sep = '\n' if add_new_line else ''
         if self.input_var is None:
-            if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
-                return f"{font['lambda_sign']} . {self.term.print(lvl)}"
-            return f"{font['lambda_sign']} . \n{self.term.print(lvl)}"
-        if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
-            return f"{font['lambda_sign']} {self.input_var.print(0)} . {self.term.print(lvl)}"
-        return f"{font['lambda_sign']} {self.input_var.print(0)} . \n{self.term.print(lvl)}"
+            return f"{font['lambda_sign']} . {line_sep}{self.term.print(lvl)}"
+        return f"{font['lambda_sign']} {self.input_var.print(0)} . {line_sep}{self.term.print(lvl)}"
 
     def get_prov_info(self, prov_info):
         next_node = get_first_node_diff_than_comment(self.term)
+        add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(self.term, ANF_E_COMM)
+        line_sep = '\n' if add_new_line else ';'
         if self.input_var is None:
-            if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
-                return ';;' + self.term.get_prov_info(None)
-            return ';\n' + self.term.get_prov_info(None)
-        if issubclass(type(next_node), ANF_V) and not isinstance(next_node, ANF_V_UNIT):
-            return ';' + self.input_var.get_prov_info(None) + ';;' + self.term.get_prov_info(None)
-        return ';' + self.input_var.get_prov_info(None) + ';\n' + self.term.get_prov_info(None)
+            return ';' + line_sep + self.term.get_prov_info(None)
+        return ';' + self.input_var.get_prov_info(None) + ';' + line_sep + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0, print_variables=True):
         if not print_variables:
@@ -562,7 +556,7 @@ def SA_BS(bs: [SSA_B], inner_call):
             func = ANF_E_FUNC(block_vars[0], func)
             block_vars = block_vars[1:]
     else:
-        func = ANF_E_FUNC(None, SA_ES(b, b.terms))
+        func = SA_ES(b, b.terms)
 
     if len(bs) == 1:
         let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, inner_call)
