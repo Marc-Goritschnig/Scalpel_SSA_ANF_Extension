@@ -12,7 +12,8 @@ debug_mode = False
 comment_separator = '--'
 COMMENT_MARKER = '#'
 buffer_var_name = '%_'
-PROV_INFO_EXT_CHAR = '|'
+PROV_INFO_EXT_CHAR = ';'
+PROV_INFO_SPLIT_CHAR = '|'
 
 # Prefix of block labels from SSA
 block_identifier = 'L'
@@ -123,7 +124,7 @@ class ANFNode:
     def print_prov_ext(self):
         prov = ''
         if self.prov_info != '':
-            prov = PROV_INFO_EXT_CHAR  + self.prov_info
+            prov = PROV_INFO_EXT_CHAR + self.prov_info
         return prov
 
 class ANF_EV(ANFNode):
@@ -163,7 +164,7 @@ class ANF_E_APP(ANF_E):
         return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
     def get_prov_info(self, prov_info):
-        return 'f' + self.name.get_prov_info(None) + self.print_prov_ext() + (';' if len(self.params) > 0 else '') + ';'.join([var.get_prov_info(None) for var in self.params])
+        return 'f' + self.name.get_prov_info(None) + self.print_prov_ext() + (PROV_INFO_SPLIT_CHAR if len(self.params) > 0 else '') + PROV_INFO_SPLIT_CHAR.join([var.get_prov_info(None) for var in self.params])
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         out = None
@@ -225,7 +226,7 @@ class ANF_E_LET(ANF_E):
         return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return ';' + self.var.get_prov_info(None) + ';;' + self.term1.get_prov_info(None) + ';\n' + self.term2.get_prov_info(None)
+        return PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         name = self.var.name
@@ -258,8 +259,8 @@ class ANF_E_LETREC(ANF_E):
 
     def get_prov_info(self, prov_info):
         add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
-        line_sep = '\n' if add_new_line else ';'
-        return ';' + self.var.get_prov_info(None) + ';' + line_sep + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
+        line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
+        return PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if re.match(block_label_regex, self.var.name):
@@ -310,7 +311,7 @@ class ANF_E_IF(ANF_E):
         return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return ';' + self.test.get_prov_info(None) + ';\n' + self.term_if.get_prov_info(None) + '\n\n' + self.term_else.get_prov_info(None)
+        return PROV_INFO_SPLIT_CHAR + self.test.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term_if.get_prov_info(None) + '\n\n' + self.term_else.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         parsed_blocks_buffer = parsed_blocks.copy()
@@ -459,10 +460,10 @@ class ANF_E_FUNC(ANF_E):
     def get_prov_info(self, prov_info):
         next_node = get_first_node_diff_than_comment(self.term)
         add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(self.term, ANF_E_COMM)
-        line_sep = '\n' if add_new_line else ';'
+        line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
         if self.input_var is None:
-            return ';' + line_sep + self.term.get_prov_info(None)
-        return ';' + self.input_var.get_prov_info(None) + ';' + line_sep + self.term.get_prov_info(None)
+            return PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
+        return PROV_INFO_SPLIT_CHAR + self.input_var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0, print_variables=True):
         if not print_variables:
@@ -675,7 +676,7 @@ def parse_anf_from_text(code: str):
                         code_words.append('\'' + part + '\'')
 
     # code_words = list(filter(lambda e: e is not None, code_words))
-    aa = parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(';')])
+    aa = parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(PROV_INFO_SPLIT_CHAR)])
     return aa
 
 # Convert an ANF code expression to ANF AST
@@ -724,7 +725,7 @@ def parse_anf_e_from_code(code_words, info_words):
 
 # Convert an ANF code value to ANF AST
 def parse_anf_v_from_code(code_word: str, info_word_with_prov: str):
-    info_word_parts = info_word_with_prov.split('|')
+    info_word_parts = info_word_with_prov.split(PROV_INFO_EXT_CHAR)
     info_word = info_word_parts[0]
 
     n = None
