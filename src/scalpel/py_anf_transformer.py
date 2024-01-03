@@ -21,6 +21,7 @@ output_folder = 'output'
 ssa_file = 'ssa_parsed.txt'
 anf_file = 'anf_parsed.txt'
 anf_with_prov_file = 'anf_parsed_with_prov_info.txt'
+compare_file = 'code_comparison.txt'
 
 default_code_to_transform = ""  # Change this value to transform another code
 
@@ -30,6 +31,7 @@ print_CFG_graph = False
 parse_back = False
 only_parse_back = False
 output_syntax = 0
+no_output_files = False
 
 def transform():
     # Print cfg into file
@@ -76,19 +78,23 @@ def transform():
         if not parse_back:
             print(trim_double_spaces(anf_ast.print(0)))
 
+        anf_w_prov = trim_double_spaces(print_anf_with_prov_info(anf_ast))
         if debug_mode:
             print('\n\n\n')
             print("Transformed AST tree with provenance printed:")
-            print(trim_double_spaces(print_anf_with_prov_info(anf_ast)))
+            print(anf_w_prov)
             print('\n\n\n')
 
         # Print parsed SSA and ANF code to output files
-        with open(output_folder + '/' + ssa_file, 'w', encoding="utf-8") as f:
-            f.write(ssa_ast.print(0))
-        with open(output_folder + '/' + anf_file, 'w', encoding="utf-8") as f:
-            f.write(anf_ast.print(0))
-        with open(output_folder + '/' + anf_with_prov_file, 'w', encoding="utf-8") as f:
-            f.write(print_anf_with_prov_info(anf_ast))
+        if not no_output_files:
+            with open(output_folder + '/' + ssa_file, 'w', encoding="utf-8") as f:
+                f.write(ssa_ast.print(0))
+            with open(output_folder + '/' + anf_file, 'w', encoding="utf-8") as f:
+                f.write(anf_ast.print(0))
+            with open(output_folder + '/' + anf_with_prov_file, 'w', encoding="utf-8") as f:
+                f.write(anf_w_prov)
+            with open(output_folder + '/' + compare_file, 'w', encoding="utf-8") as f:
+                f.write(ssa_ast.code + '\n##########\n' + anf_w_prov)
 
     if parse_back or only_parse_back:
 
@@ -184,23 +190,25 @@ def str2bool(v):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='This is the discription')
-    parser.add_argument("--input_path", '-i', required=True, default=None, type=str, help="The filepath for the python code to be transformed")
-    parser.add_argument("--out_path", '-o', default='output', type=str, help="Under this path all saved files will be placed, if not given the files will be saved in a locally created output folder")
-    parser.add_argument("--ssa_out_name", '--ssa', default='ssa_parsed.txt', type=str, help="The filename for the generated SSA code")
-    parser.add_argument("--anf_out_name", '--anf', default='anf_parsed.txt', type=str, help="The filename for the generated ANF code")
-    parser.add_argument("--anf_with_prov_out_name", '-anf_plus', default='anf_parsed_with_prov_info.txt', type=str, help="The filename for the generated ANF code including provenance information")
-    parser.add_argument("--debug_mode", '-d', default=False, type=str2bool, help="Shows more information and logs when True")
-    parser.add_argument("--save_cfg", '--cfg', default=False, type=str2bool, help="Saves the generated CFG in DOT format")
-    parser.add_argument("--parse_back", '--back', default=False, type=str2bool, help="When True the transformation back will be done")
-    parser.add_argument("--only_parse_back", default=False, type=str2bool, help="When True the input file will be interpreted as ANF code with annotations and parsed back into Python code")
-    parser.add_argument("--output_syntax", default=0, type=int, help="The format in which the output is printed (0...ascii, 1...code)")
+    parser.add_argument('-i', '--input_path', required=True, default=None, type=str, help="The filepath for the python code to be transformed")
+    parser.add_argument('-o', '--output_path', default='output', type=str, help="Under this path all saved files will be placed, if not given the files will be saved in a locally created output folder")
+    # parser.add_argument("--ssa_out_name", '--ssa', default='ssa_parsed.txt', type=str, help="The filename for the generated SSA code")
+    # parser.add_argument("--anf_out_name", '--anf', default='anf_parsed.txt', type=str, help="The filename for the generated ANF code")
+    # parser.add_argument("--anf_with_prov_out_name", '-anf_plus', default='anf_parsed_with_prov_info.txt', type=str, help="The filename for the generated ANF code including provenance information")
+    parser.add_argument('-d', '--debug_mode', action='store_true', help="Shows more information and logs when True")
+    parser.add_argument('-c', '--save_cfg', action='store_true', help="Saves the generated CFG in DOT format")
+    parser.add_argument('-b', '--parse_back', action='store_true', help="When True the transformation back will be done")
+    parser.add_argument('-p', '--only_parse_back', action='store_true', help="When True the input file will be interpreted as ANF code with provenance information and parsed back into Python code")
+    parser.add_argument('-s', '--output_syntax', default=0, type=int, help="The format in which the output is printed (0...ascii, 1...code)")
+    parser.add_argument('-n', '--no_output_files', action='store_true', help="When True the library will save no files and only print onto the console")
 
     args = parser.parse_args()
 
-    output_folder = args.out_path
-    ssa_file = args.ssa_out_name
-    anf_file = args.anf_out_name
-    anf_with_prov_file = args.anf_with_prov_out_name
+    output_folder = args.output_path
+    # ssa_file = args.ssa_out_name
+    # anf_file = args.anf_out_name
+    # anf_with_prov_file = args.anf_with_prov_out_name
+    no_output_files = args.no_output_files
     python_code_path = args.input_path
     debug_mode = str2bool(args.debug_mode)
     print_CFG_graph = str2bool(args.save_cfg)

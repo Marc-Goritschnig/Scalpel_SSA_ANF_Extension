@@ -101,8 +101,12 @@ def reset():
 
 
 class ANFNode:
-    def __init__(self):
+    def __init__(self, ssa_node: SSANode = None):
         self.prov_info = ''
+        self.pos_info = None
+        if ssa_node is not None:
+            if ssa_node.pos_info is not None:
+                self.pos_info = ssa_node.pos_info
 
     def print(self, lvl = 0):
         return 'not implemented'
@@ -123,13 +127,17 @@ class ANFNode:
 
     def print_prov_ext(self):
         prov = ''
+        if self.pos_info is not None:
+            prov += str(self.pos_info)
         if self.prov_info != '':
-            prov = PROV_INFO_EXT_CHAR + self.prov_info
+            prov += self.prov_info
+        if prov != '':
+            prov = PROV_INFO_EXT_CHAR + prov
         return prov
 
 class ANF_EV(ANFNode):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
 
     def print(self, lvl = 0):
         return ''
@@ -142,8 +150,8 @@ class ANF_EV(ANFNode):
 
 
 class ANF_E(ANF_EV):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
 
     def print(self, lvl = 0):
         return ''
@@ -155,8 +163,8 @@ class ANF_E(ANF_EV):
         return None
 
 class ANF_E_APP(ANF_E):
-    def __init__(self, params: [ANF_V], name: ANF_V):
-        super().__init__()
+    def __init__(self, params: [ANF_V], name: ANF_V, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.params: [ANF_V] = params
         self.name: ANF_V = name
 
@@ -193,8 +201,8 @@ class ANF_E_APP(ANF_E):
         return '\n'.join(lines)
 
 class ANF_E_COMM(ANF_E):
-    def __init__(self, text: str, term: ANF_E):
-        super().__init__()
+    def __init__(self, text: str, term: ANF_E, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.text: str = text
         self.term: ANF_E = term
 
@@ -216,8 +224,8 @@ class ANF_E_COMM(ANF_E):
 
 
 class ANF_E_LET(ANF_E):
-    def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E):
-        super().__init__()
+    def __init__(self, var: ANF_V, term1: ANF_E, term2: ANF_E, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.var: ANF_V = var
         self.term1: ANF_E = term1
         self.term2: ANF_E = term2
@@ -245,8 +253,8 @@ class ANF_E_LET(ANF_E):
         return out
 
 class ANF_E_LETREC(ANF_E):
-    def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E):
-        super().__init__()
+    def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.var: ANF_V = var
         self.term1: ANF_EV = term1
         self.term2: ANF_E = term2
@@ -301,8 +309,8 @@ def get_next_non_function_term(next):
 
 
 class ANF_E_IF(ANF_E):
-    def __init__(self, test: ANF_V_VAR, term_if: ANF_E, term_else: ANF_E):
-        super().__init__()
+    def __init__(self, test: ANF_V_VAR, term_if: ANF_E, term_else: ANF_E, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.test: ANF_V_VAR = test
         self.term_if: ANF_E = term_if
         self.term_else: ANF_E = term_else
@@ -366,8 +374,8 @@ class ANF_E_IF(ANF_E):
         return out
 
 class ANF_V(ANF_EV):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.is_buffer_var: bool = False
         self.is_block_id: bool = False
 
@@ -381,8 +389,8 @@ class ANF_V(ANF_EV):
         return get_indentation(lvl) + 'ANF_V'
 
 class ANF_V_CONST(ANF_V):
-    def __init__(self, value: str):
-        super().__init__()
+    def __init__(self, value: str, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.value: str = value
 
     def print(self, lvl = 0, prov_info: str = ''):
@@ -401,8 +409,8 @@ def postprocessing_ANF_V_to_python(n: ANFNode, out: str):
     return out
 
 class ANF_V_VAR(ANF_V):
-    def __init__(self, name: str, is_buffer_var: bool = False, is_block_id: bool = False):
-        super().__init__()
+    def __init__(self, name: str, is_buffer_var: bool = False, is_block_id: bool = False, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.name: str = name
         self.is_buffer_var: bool = is_buffer_var
         self.is_block_id: bool = is_block_id
@@ -430,8 +438,8 @@ def normalize_name(name: str):
 
 
 class ANF_V_UNIT(ANF_V):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, ssa_node: SSANode = None):
+        super().__init__(ssa_node)
 
     def print(self, lvl = 0, prov_info: str = ''):
         return get_indentation(lvl) + "unit"
@@ -444,8 +452,8 @@ class ANF_V_UNIT(ANF_V):
 
 
 class ANF_E_FUNC(ANF_E):
-    def __init__(self, input_var: ANF_V, term: ANF_E):
-        super().__init__()
+    def __init__(self, input_var: ANF_V, term: ANF_E, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
         self.input_var: ANF_V = input_var
         self.term: ANF_E = term
 
@@ -604,12 +612,12 @@ def unwrap_inner_applications_let_structure(var: SSA_V, inner, unwrap_var: bool 
     if isinstance(var, SSA_V_FUNC_CALL):
         if unwrap_var:
             name = buffer_assignments[var]
-            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name, True), SA_V(var), inner))
+            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name, True), SA_V(var), inner, ssa_node=var))
         else:
             for arg in var.args:
                 if isinstance(arg, SSA_V_FUNC_CALL):
                     name = buffer_assignments[arg]
-                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True), SA_V(arg), inner))
+                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True), SA_V(arg), inner, ssa_node=arg))
     return inner
 
 
@@ -628,16 +636,16 @@ def unwrap_inner_applications_naming(var: SSA_V, unwrap_var: bool = False):
 # Transform values from SSA to ANF
 def SA_V(var: SSA_V, can_be_buffered: bool = False):
     if isinstance(var, SSA_V_VAR):
-        return ANF_V_VAR(var.name)
+        return ANF_V_VAR(var.name, ssa_node=var)
     if isinstance(var, SSA_V_CONST):
-        return ANF_V_CONST(var.value)
+        return ANF_V_CONST(var.value, ssa_node=var)
     if isinstance(var, SSA_L):
-        return ANF_V_CONST(var.label)
+        return ANF_V_CONST(var.label, ssa_node=var)
     if isinstance(var, SSA_V_FUNC_CALL):
         if can_be_buffered and var in buffer_assignments:
-            return ANF_V_VAR(buffer_assignments[var])
+            return ANF_V_VAR(buffer_assignments[var], ssa_node=var)
         else:
-            return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par]) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name))
+            return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par], ssa_node=par) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name), ssa_node=var)
 
     return ANF_V_CONST('Not impl')
 
