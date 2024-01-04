@@ -6,7 +6,11 @@
   <div class="container">
 
     <div class="content-container">
-      <p class="txt" id="code" [innerHTML]="pyCode"></p>
+      <pre class="txt">
+        <code #code1 [languages]="['python']" [highlight]="pyCode"></code>
+      </pre>
+      <p class="txt overlay-highlight" id="code" [innerHTML]="pyCode"></p>
+
     </div>
 
     <div class="content-container">

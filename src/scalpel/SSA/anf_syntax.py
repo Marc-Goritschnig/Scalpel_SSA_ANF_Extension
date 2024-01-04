@@ -590,9 +590,9 @@ def SA_BS(bs: [SSA_B], inner_call):
         func = SA_ES(b, b.terms)
 
     if len(bs) == 1:
-        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, inner_call, ssa_node=b)
+        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b), func, inner_call, ssa_node=b)
     else:
-        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, SA_BS(bs[1:], inner_call), ssa_node=b)
+        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b), func, SA_BS(bs[1:], inner_call), ssa_node=b)
 
     return let_rec
 
@@ -609,7 +609,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         unwrap_inner_applications_naming(term.value)
         return unwrap_inner_applications_let_structure(term.value, ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:]), ssa_node=term))
     if isinstance(term, SSA_E_GOTO):
-        return ANF_E_APP([SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label))], ANF_V_CONST(block_identifier + term.label.label))
+        return ANF_E_APP([SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label))], ANF_V_CONST(block_identifier + term.label.label, ssa_node=term), ssa_node=term)
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
     if isinstance(term, SSA_E_RET):

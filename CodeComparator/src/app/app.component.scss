@@ -26,6 +26,12 @@
         white-space: break-spaces;
       }
 
+      .overlay-highlight{
+        position: absolute;
+        top: 2px;
+        color: transparent;
+      }
+
       .keyword{
         color: #07a1ff;
       }
@@ -42,7 +48,7 @@
         color: #ababab;
       }
       .constant{
-        color: #ff8000;
+        color: #ea7f26;
       }
       .string{
         color: #249a00;
@@ -54,11 +60,11 @@
             color: white;
             border-radius: 0.4rem;
             padding: 0 0.2rem;
+            margin: 0 -0.1rem;
           }
         }
       }
     }
-
   }
 
   .file-btn {
@@ -81,10 +87,13 @@
 
 ::ng-deep {
   .highlight {
-    background: rgb(0 135 255);
-    color: white;
+    border: 1px solid rgb(255 155 0 / 99%);
+    background: rgb(255 96 0 / 17%);
+    position: relative;
+    z-index: 1;
     border-radius: 0.4rem;
     padding: 0 0.2rem;
+    margin: 0 -0.2rem;
 
     display: inline-block;
     -webkit-box-decoration-break: clone;
@@ -101,6 +110,9 @@ pre{
   margin: 0;
   padding: 0;
   display: grid;
+  position: relative;
+  z-index: 1;
+
   code{
     display: block;
     span:last-child{

@@ -4,7 +4,7 @@ Author: Pedro Oliveira <kanytu@gmail . com>
 */
 
 .hljs {
-  color: #a9b7c6;
+  color: #29496b;
   /* background: #282b2e;*/
 }
 
@@ -12,13 +12,13 @@ Author: Pedro Oliveira <kanytu@gmail . com>
 .hljs-literal,
 .hljs-symbol,
 .hljs-bullet {
-  color: #6897BB;
+  color: #4188be;
 }
 
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-deletion {
-  color: #cc7832;
+  color: #ea7f26;
 }
 
 .hljs-variable,
@@ -29,7 +29,7 @@ Author: Pedro Oliveira <kanytu@gmail . com>
 
 .hljs-comment,
 .hljs-quote {
-  color: #808080;
+  color: #9b9b9b;
 }
 
 .hljs-meta {
@@ -39,19 +39,19 @@ Author: Pedro Oliveira <kanytu@gmail . com>
 .hljs-string,
 .hljs-attribute,
 .hljs-addition {
-  color: #6A8759;
+  color: #558f34;
 }
 
 .hljs-section,
 .hljs-title,
 .hljs-type {
-  color: #ffc66d;
+  color: #ffb848;
 }
 
 .hljs-name,
 .hljs-selector-id,
 .hljs-selector-class {
-  color: #e8bf6a;
+  color: #e3ae41;
 }
 
 .hljs-emphasis {

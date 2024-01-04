@@ -1,4 +1,4 @@
-import {Component} from '@angular/core';
+import {Component, ViewChild} from '@angular/core';
 import {CommonModule} from '@angular/common';
 import {RouterOutlet} from '@angular/router';
 import {HighlightModule} from "ngx-highlightjs";
@@ -12,6 +12,14 @@ import {HighlightModule} from "ngx-highlightjs";
 })
 export class AppComponent {
   title = 'CodeComparator';
+
+  @ViewChild('code1') code1: any;
+  @ViewChild('code2') code2: any;
+  @ViewChild('code3') code3: any;
+
+  public pyCodeBefore = '';
+  public pyCodeHighlighted = '';
+  public pyCodeAfter = '';
 
   public pyCode = '';
   public pyCodeLines: Array<string> = [];
@@ -47,14 +55,15 @@ export class AppComponent {
       w = words[1];
     }
 
-    const isFirstWord = idx == 0 || (idx == 1 && words[0].text.match('^(&nbsp;)+?'))
-
-    const codeElement = document.getElementById("code");
+    let codeElement = document.getElementById('code');
 
     if (codeElement) {
       if (w.pos.lineno === 0) {
         codeElement.innerHTML = this.pyCode;
       } else {
+
+        const indentation = this.pyCodeLines[w.pos.lineno - 1].match('^ +');
+
         let txtHighlighted = '';
         let txtBefore = '';
         let txtAfter = '';
@@ -82,7 +91,7 @@ export class AppComponent {
           txtHighlighted += this.pyCodeLines[w.pos.end_lineno - 1].slice(0, w.pos.end_col_offset);
         }
 
-        if (isFirstWord) {
+        if (indentation) {
           // Remove indentation corresponding to col_offset because inline block css is used
           let i = 0;
           let lines: string[] = [];
@@ -96,7 +105,7 @@ export class AppComponent {
               i++;
               continue;
             }
-            lines.push(line.slice(w.pos.col_offset));
+            lines.push(line.slice(indentation[0].length));
             i++;
           }
           txtHighlighted = lines.join('\n');
@@ -118,7 +127,12 @@ export class AppComponent {
         console.log(txtHighlighted);
         console.log(txtAfter);
 
+        this.pyCodeBefore = txtBefore;
+        this.pyCodeHighlighted = txtHighlighted;
+        this.pyCodeAfter = txtAfter;
+
         codeElement.innerHTML = txtBefore + '<span class="highlight">' + txtHighlighted + '</span>' + txtAfter;
+
       }
     }
   }
@@ -223,7 +237,6 @@ class Position {
       this.col_offset = +start[1];
       this.end_lineno = +end[0];
       this.end_col_offset = +end[1];
-
     }
   }
 }

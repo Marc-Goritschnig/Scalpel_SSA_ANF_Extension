@@ -30,7 +30,7 @@ def IsEasyChairQuery(input: str) -> bool:
 IsEasyChairQuery('test')
 ##########
 letrec IsEasyChairQuery_0 = lambda input . --;1:0,29:15|v;1:0,29:15||;1:0,29:15|v;1:21,1:31|
-    letrec L3 = --;5:4,6:37|c;|
+    letrec L3 = --;2:4,8:64|c;2:4,8:64|
         # (1) check that input contains "/" followed by anything not                                       --
         # containing "/" and containing "EasyChair"                                                        --
         #-SSA-Attribute                                                                                    --
@@ -38,66 +38,66 @@ letrec IsEasyChairQuery_0 = lambda input . --;1:0,29:15|v;1:0,29:15||;1:0,29:15|
             let lastSlash_0 = _SSA_0_0 in --;6:4,6:22|v;6:4,6:13|;6:4,6:22|v;6:16,6:22|
                 let %_0 = _Lt lastSlash_0 0 in --;|bv;|;|fv;;|v;7:7,7:16|c;7:19,7:20|
                     if %_0 then --;|v;|
-                        L4 --fc;;
+                        L4 --fc;8:8,8:20;8:8,8:20
                     else --
-                        L5 --fc;;
+                        L5 --fc;9:4,11:32;9:4,11:32
     in --
-        letrec L4 = False in --;8:15,8:20|c;||c;8:15,8:20;RET|
-            letrec L5 = --;9:4,9:32|c;|
-                let %_1 = _Add lastSlash_0 1 in --;9:17,9:30|bv;9:17,9:30|;9:17,9:30|fv;;9:17,9:30|v;9:17,9:26|c;9:29,9:30|
-                    let rest_0 = _List_Slice_L input %_1 in --;9:4,9:32|v;9:4,9:8|;9:4,9:32|fv;;9:11,9:32|v;9:11,9:16|v;9:17,9:30|
+        letrec L4 = False in --;8:8,8:20|c;8:8,8:20||c;8:15,8:20;RET|
+            letrec L5 = --;9:4,11:32|c;9:4,11:32|
+                let %_1 = _Add lastSlash_0 1 in --;9:17,9:30|bv;9:17,9:30|;9:17,9:30|fv;9:17,9:30;9:17,9:30|v;9:17,9:26|c;9:29,9:30|
+                    let rest_0 = _List_Slice_L input %_1 in --;9:4,9:32|v;9:4,9:8|;9:4,9:32|fv;9:11,9:32;9:11,9:32|v;9:11,9:16|v;9:17,9:30|
                         let %_2 = _NotIn 'EasyChair' rest_0 in --;|bv;|;|fv;;|c;10:7,10:18|v;10:26,10:30|
                             if %_2 then --;|v;|
-                                L7 --fc;;
+                                L7 --fc;11:8,11:20;11:8,11:20
                             else --
-                                L8 --fc;;
+                                L8 --fc;12:4,16:48;12:4,16:48
             in --
-                letrec L7 = False in --;11:15,11:20|c;||c;11:15,11:20;RET|
-                    letrec L8 = --;14:4,15:47|c;|
+                letrec L7 = False in --;11:8,11:20|c;11:8,11:20||c;11:15,11:20;RET|
+                    letrec L8 = --;12:4,16:48|c;12:4,16:48|
                         # (2) Check that input starts with "http://"                                       --
                         #-SSA-Attribute                                                                    --
                         let _SSA_2_0 = _obj2_startswith input 'http://' in --;14:4,14:47|v;14:4,14:10|;14:4,14:47|fv;14:13,14:29;14:13,14:47|v;14:30,14:35|c;14:37,14:46|
-                            let %_3 = _Not _SSA_2_0 in --;15:7,15:17|bv;15:7,15:17|;15:7,15:17|fv;;15:7,15:17|v;15:11,15:17|
+                            let %_3 = _Not _SSA_2_0 in --;15:7,15:17|bv;15:7,15:17|;15:7,15:17|fv;15:7,15:17;15:7,15:17|v;15:11,15:17|
                                 if %_3 then --;|v;15:7,15:17|
-                                    L10 --fc;;
+                                    L10 --fc;16:8,16:20;16:8,16:20
                                 else --
-                                    L11 --fc;;
+                                    L11 --fc;17:4,23:61;17:4,23:61
                     in --
-                        letrec L10 = False in --;16:15,16:20|c;||c;16:15,16:20;RET|
-                            letrec L11 = --;19:4,22:40|c;|
+                        letrec L10 = False in --;16:8,16:20|c;16:8,16:20||c;16:15,16:20;RET|
+                            letrec L11 = --;17:4,23:61|c;17:4,23:61|
                                 # (3) Take the string between "http://" and the last "/".                  --
                                 # if it starts with "www." strip the "www." off                            --
                                 let %_4 = len 'http://' in --;19:14,19:28|bv;19:14,19:28|;19:14,19:28|fv;19:14,19:17;19:14,19:28|c;19:18,19:27|
-                                    let t_0 = _List_Slice_LU input %_4 lastSlash_0 in --;19:4,19:39|v;19:4,19:5|;19:4,19:39|fv;;19:8,19:39|v;19:8,19:13|v;19:14,19:28|v;19:29,19:38|
+                                    let t_0 = _List_Slice_LU input %_4 lastSlash_0 in --;19:4,19:39|v;19:4,19:5|;19:4,19:39|fv;19:8,19:39;19:8,19:39|v;19:8,19:13|v;19:14,19:28|v;19:29,19:38|
                                         #-SSA-Attribute                                                    --
                                         let _SSA_1_0 = _obj2_startswith t_0 'www.' in --;21:4,21:40|v;21:4,21:10|;21:4,21:40|fv;21:13,21:29;21:13,21:40|v;21:30,21:31|c;21:33,21:39|
                                             if _SSA_1_0 then --;|v;22:7,22:13|
-                                                L13 --fc;;
+                                                L13 --fc;23:8,23:26;23:8,23:26
                                             else --
-                                                L14 t_0 --fc;;|v;
+                                                L14 t_0 --fc;24:4,27:62;24:4,27:62|v;
                             in --
-                                letrec L13 = --;23:8,23:26|c;|
+                                letrec L13 = --;23:8,23:26|c;23:8,23:26|
                                     let %_5 = len 'www.' in --;23:14,23:25|bv;23:14,23:25|;23:14,23:25|fv;23:14,23:17;23:14,23:25|c;23:18,23:24|
-                                        let t_1 = _LSD_Get t_0 %_5 in --;23:8,23:26|v;23:8,23:9|;23:8,23:26|fv;;23:12,23:26|v;23:12,23:13|v;23:14,23:25|
-                                            L14 t_1 --fc;;|v;
+                                        let t_1 = _LSD_Get t_0 %_5 in --;23:8,23:26|v;23:8,23:9|;23:8,23:26|fv;23:12,23:26;23:12,23:26|v;23:12,23:13|v;23:14,23:25|
+                                            L14 t_1 --fc;24:4,27:62;24:4,27:62|v;
                                 in --
-                                    letrec L14 = lambda t_2 . --;26:7,26:44|c;||;26:7,26:44|v;|
+                                    letrec L14 = lambda t_2 . --;24:4,27:62|c;24:4,27:62||;24:4,27:62|v;|
                                         # (4) Check that after stripping we have either "live.com"         --
                                         # or "google.com"                                                  --
                                         let %_8 = _NotEq t_2 'google.com' in --;|bv;|;|fv;;|v;26:27,26:28|c;26:32,26:44|
                                             let %_7 = _NotEq t_2 'live.com' in --;|bv;|;|fv;;|v;26:7,26:8|c;26:12,26:22|
-                                                let %_6 = _And %_7 %_8 in --;26:7,26:44|bv;26:7,26:44|;26:7,26:44|fv;;26:7,26:44|v;|v;|
+                                                let %_6 = _And %_7 %_8 in --;26:7,26:44|bv;26:7,26:44|;26:7,26:44|fv;26:7,26:44;26:7,26:44|v;|v;|
                                                     if %_6 then --;|v;26:7,26:44|
-                                                        L15 --fc;;
+                                                        L15 --fc;27:8,27:20;27:8,27:20
                                                     else --
-                                                        L16 in --fc;;|
-                                        letrec L15 = False in --;27:15,27:20|c;||c;27:15,27:20;RET|
-                                            letrec L16 = --;29:11,29:15|c;|
+                                                        L16 in --fc;28:4,29:27;28:4,29:27|
+                                        letrec L15 = False in --;27:8,27:20|c;27:8,27:20||c;27:15,27:20;RET|
+                                            letrec L16 = --;28:4,29:27|c;28:4,29:27|
                                                 # s survived all checks                                    --
                                                 True --c;29:11,29:15;RET
                                             in --
                                                 L3 in --fv;;|
-    letrec L1 = --;30:0,30:24|c;|
+    letrec L1 = --;30:0,30:24|c;30:0,30:24|
         let _ = IsEasyChairQuery_0 'test' in --;30:0,30:24|c;|;30:0,30:24|fv;30:0,30:16;30:0,30:24|c;30:17,30:23|
             unit --u
     in --
