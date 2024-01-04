@@ -9,63 +9,67 @@ letrec IsEasyChairQuery_0 = lambda input .
                     if %_0 then 
                         L4  
                     else
-                        L5 
+                        L6 
     in
         letrec L4 =             False in
-            letrec L5 = 
-                let %_1 = _Add lastSlash_0 1 in 
-                    let rest_0 = _List_Slice_L input %_1 in 
-                        let %_2 = _NotIn 'EasyChair' rest_0 in 
-                            if %_2 then 
-                                L7  
-                            else
-                                L8 
+            letrec L6 = 
+                let _ = print 'sdf' in 
+                    L5 
             in
-                letrec L7 =                     False in
-                    letrec L8 = 
-                        # (2) Check that input starts with "http://"
-                        #-SSA-Attribute
-                        let _SSA_2_0 = _obj2_startswith input 'http://' in 
-                            let %_3 = _Not _SSA_2_0 in 
-                                if %_3 then 
-                                    L10  
+                letrec L5 = 
+                    let %_1 = _Add lastSlash_0 1 in 
+                        let rest_0 = _List_Slice_L input %_1 in 
+                            let %_2 = _NotIn 'EasyChair' rest_0 in 
+                                if %_2 then 
+                                    L8  
                                 else
-                                    L11 
-                    in
-                        letrec L10 =                             False in
-                            letrec L11 = 
-                                # (3) Take the string between "http://" and the last "/".
-                                # if it starts with "www." strip the "www." off
-                                let %_4 = len 'http://' in 
-                                    let t_0 = _List_Slice_LU input %_4 lastSlash_0 in 
-                                        #-SSA-Attribute
-                                        let _SSA_1_0 = _obj2_startswith t_0 'www.' in 
-                                            if _SSA_1_0 then 
-                                                L13  
-                                            else
-                                                L14 t_0
-                            in
-                                letrec L13 = 
-                                    let %_5 = len 'www.' in 
-                                        let t_1 = _LSD_Get t_0 %_5 in 
-                                            L14 t_1
+                                    L9 
+                in
+                    letrec L8 =                         False in
+                        letrec L9 = 
+                            # (2) Check that input starts with "http://"
+                            #-SSA-Attribute
+                            let _SSA_2_0 = _obj2_startswith input 'http://' in 
+                                let %_3 = _Not _SSA_2_0 in 
+                                    if %_3 then 
+                                        L11  
+                                    else
+                                        L12 
+                        in
+                            letrec L11 =                                 False in
+                                letrec L12 = 
+                                    # (3) Take the string between "http://" and the last "/".
+                                    # if it starts with "www." strip the "www." off
+                                    let %_4 = len 'http://' in 
+                                        let t_0 = _List_Slice_LU input %_4 lastSlash_0 in 
+                                            #-SSA-Attribute
+                                            let _SSA_1_0 = _obj2_startswith t_0 'www.' in 
+                                                if _SSA_1_0 then 
+                                                    L14  
+                                                else
+                                                    L15 t_0
                                 in
-                                    letrec L14 = lambda t_2 . 
-                                        # (4) Check that after stripping we have either "live.com"
-                                        # or "google.com"
-                                        let %_8 = _NotEq t_2 'google.com' in 
-                                            let %_7 = _NotEq t_2 'live.com' in 
-                                                let %_6 = _And %_7 %_8 in 
-                                                    if %_6 then 
-                                                        L15  
-                                                    else
-                                                        L16  in
-                                        letrec L15 =                                             False in
-                                            letrec L16 = 
-                                                # s survived all checks
-                                                True
-                                            in
-                                                L3  in
+                                    letrec L14 = 
+                                        let %_5 = len 'www.' in 
+                                            let t_1 = _LSD_Get t_0 %_5 in 
+                                                L15 t_1
+                                    in
+                                        letrec L15 = lambda t_2 . 
+                                            # (4) Check that after stripping we have either "live.com"
+                                            # or "google.com"
+                                            let %_8 = _NotEq t_2 'google.com' in 
+                                                let %_7 = _NotEq t_2 'live.com' in 
+                                                    let %_6 = _And %_7 %_8 in 
+                                                        if %_6 then 
+                                                            L16  
+                                                        else
+                                                            L17  in
+                                            letrec L16 =                                                 False in
+                                                letrec L17 = 
+                                                    # s survived all checks
+                                                    True
+                                                in
+                                                    L3  in
     letrec L1 = 
         let _ = IsEasyChairQuery_0 'test' in 
             unit

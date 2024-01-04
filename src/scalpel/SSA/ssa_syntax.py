@@ -1152,9 +1152,10 @@ def get_global_unique_name(var_name, parent_vars):
 
 # Recursively generate a call stack with ops and comparators
 def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
+    pos = Position([left, comparators[0]])
     if len(ops) == 1:
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
-    new_left = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)))
+        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__, pos_info=pos), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)), pos_info=pos)
+    new_left = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__, pos_info=pos), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)), pos_info=pos)
     return PS_MAP2(new_left, ops[1:], comparators[1:], st_nr)
 
 

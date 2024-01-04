@@ -247,7 +247,7 @@ class ANF_E_LET(ANF_E):
         return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term2.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         name = self.var.name
@@ -282,7 +282,7 @@ class ANF_E_LETREC(ANF_E):
     def get_prov_info(self, prov_info):
         add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
         line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + line_sep + '\n' + self.term2.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + line_sep + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if re.match(block_label_regex, self.var.name):
@@ -333,7 +333,7 @@ class ANF_E_IF(ANF_E):
         return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.test.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term_if.get_prov_info(None) + '\n\n' + self.term_else.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.test.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term_if.get_prov_info(None) + '\n' + self.print_prov_ext() + '\n' + self.term_else.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         parsed_blocks_buffer = parsed_blocks.copy()
@@ -621,7 +621,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         return unwrap_inner_applications_let_structure(term.value, x)
     if isinstance(term, SSA_E_IF_ELSE):
         unwrap_inner_applications_naming(term.test, True)
-        return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else])), True)
+        return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else]), ssa_node=term), True)
     if issubclass(type(term), SSA_V):
         unwrap_inner_applications_naming(term)
         return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:]), ssa_node=term))

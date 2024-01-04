@@ -185,7 +185,7 @@ export class AppComponent {
 
   }
 
-  keywords = ['let', 'letrec', '=', 'in'];
+  keywords = ['let', 'letrec', '=', 'in', 'if', 'else', 'then'];
 
   isKeyWord(w: Word) {
     return this.keywords.indexOf(w.text) > -1;
