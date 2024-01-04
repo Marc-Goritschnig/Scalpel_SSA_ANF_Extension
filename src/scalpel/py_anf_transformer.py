@@ -13,7 +13,7 @@ print(content_root)
 if content_root not in sys.path:
     sys.path.append(content_root)
 
-from scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info, parse_anf_to_ssa
+from scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info
 from scalpel.SSA.ssa_syntax import PY_to_SSA_AST, parse_ssa_to_python
 
 output_folder = 'output'
@@ -57,6 +57,7 @@ def transform():
     else:
         # Reformat the code
         py_code = ast.unparse(ast.parse(py_code))
+        x = ast.parse(py_code)
 
         # Create a SSA AST from python code
         ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
@@ -107,7 +108,7 @@ def transform():
 
                 if debug_mode:
                     print('Parsed anf tree printed:')
-                    print(parsed.print(0))
+                    print(trim_double_spaces(parsed.print(0)))
                     print('\n\n\n')
 
         # Parsing the anf code back to Python

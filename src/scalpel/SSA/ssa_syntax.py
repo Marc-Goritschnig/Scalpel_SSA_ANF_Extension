@@ -74,15 +74,51 @@ def reset():
     buffer_assignments_ssa_py = {}
 
 
+def find_child_positions(node: any, depth = 0) -> [Position]:
+    positions = []
+
+    if hasattr(node, '__dict__'):
+        if hasattr(node, 'lineno'):
+            positions.append(node)
+        if hasattr(node, 'pos_info'):
+            if node.pos_info is not None:
+                positions.append(node.pos_info)
+        if True: # depth == 0:
+            for a, v in node.__dict__.items():
+                if not a.startswith('__'):
+                    if v is not None:
+                        positions += find_child_positions(v, depth=depth + 1)
+    elif isinstance(node, list):
+        for n in node:
+            positions += find_child_positions(n, depth)
+    return positions
+
+
 class Position:
     def __init__(self, node):
-        if hasattr(node, 'lineno'):
+        if node is not None and hasattr(node, 'lineno'):
             self.lineno = node.lineno
             self.col_offset = node.col_offset
             self.end_lineno = node.end_lineno
             self.end_col_offset = node.end_col_offset
+        elif node is not None:
+            positions = find_child_positions(node)
+            if len(positions) > 0:
+                self.lineno = 99999
+                self.col_offset = 99999
+                self.end_lineno = 0
+                self.end_col_offset = 0
+                for p in positions:
+                    self.lineno = min(self.lineno, p.lineno)
+                    self.end_lineno = max(self.end_lineno, p.end_lineno)
+                    self.col_offset = min(self.col_offset, p.col_offset)
+                    self.end_col_offset = max(self.end_col_offset, p.end_col_offset)
         else:
             print('No Line number found')
+            self.lineno = 99999
+            self.col_offset = 99999
+            self.end_lineno = 0
+            self.end_col_offset = 0
 
     def __str__(self):
         return str(self.lineno) + ':' + str(self.col_offset) + ',' + str(self.end_lineno) + ':' + str(self.end_col_offset)
@@ -808,7 +844,7 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars)
 
         # Parse the current functino CFG into SSA
-        procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg) for arg in args], PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))))
+        procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0'), [SSA_V_VAR(arg.arg, pos_info=Position(arg)) for arg in args], PS_BS(prov_info, sort_blocks(cfg.get_all_blocks())), pos_info=Position(cfg.ast_node)))
 
         # Update the used variable names
         update_used_vars(ssa_results_stored, const_dict)
@@ -861,7 +897,7 @@ def PS_B(prov_info, block, first_in_proc):
             stmts += [SSA_E_GOTO(PS_B_REF(prov_info, block.exits[0].target))]
 
         # Create a new SSA Block
-        b = SSA_B(block_ref, stmts, first_in_proc)
+        b = SSA_B(block_ref, stmts, first_in_proc, pos_info=Position(stmts))
 
         return [b]
 
@@ -996,10 +1032,10 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if isinstance(stmt, ast.BinOp):
         return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)], Position(stmt))
     elif isinstance(stmt, ast.BoolOp):
-        result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values[:2]], Position(stmt))
+        result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values[:2]], Position(stmt.values[0:2]))
         values = stmt.values[2:]
         while len(values) > 0:
-            result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)], Position(stmt))
+            result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)], Position([result, values[0]]))
             values = values[1:]
         return result
     elif isinstance(stmt, ast.NamedExpr):

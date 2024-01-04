@@ -1,0 +1,110 @@
+.content {
+  display: grid;
+  justify-content: center;
+  align-items: center;
+
+  .container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    max-width: 100vw;
+    width: max-content;
+    gap: 1rem;
+    transform: scale(1.4);
+    transform-origin: top;
+
+    .content-container {
+      background: #f7f7f7;
+      border-radius: 1rem;
+      padding: 1rem;
+      box-shadow: 0 0 1rem #dfdfdf;
+
+      .txt {
+        font-size: 0.9rem;
+        font-weight: 500;
+        padding: 0 0.1rem;
+        color: #3d3d3d;
+        white-space: break-spaces;
+      }
+
+      .keyword{
+        color: #07a1ff;
+      }
+      .fun-call{
+        color: #ff079c;
+      }
+      .block-label{
+        color: #969400;
+      }
+      .buffer-var{
+        color: #cb5200;
+      }
+      .comment{
+        color: #ababab;
+      }
+      .constant{
+        color: #ff8000;
+      }
+      .string{
+        color: #249a00;
+      }
+      .line {
+        .highlightable {
+          &:hover {
+            background: rgb(0 135 255);
+            color: white;
+            border-radius: 0.4rem;
+            padding: 0 0.2rem;
+          }
+        }
+      }
+    }
+
+  }
+
+  .file-btn {
+    border-radius: 0.6rem;
+    background: #f3f3f3;
+    padding: 0.3rem 0.6rem;
+    font-weight: 600;
+    box-shadow: 0 0 1rem #c7c7c7;
+    border: 1px solid #cdcdcd;
+    color: #3d3d3d;
+    margin: 2rem auto 2rem auto;
+    cursor: pointer;
+
+    &:hover{
+      transform: scale(1.05);
+    }
+  }
+
+}
+
+::ng-deep {
+  .highlight {
+    background: rgb(0 135 255);
+    color: white;
+    border-radius: 0.4rem;
+    padding: 0 0.2rem;
+
+    display: inline-block;
+    -webkit-box-decoration-break: clone;
+    -o-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+}
+
+* {
+  font-family: 'Roboto';
+}
+
+pre{
+  margin: 0;
+  padding: 0;
+  display: grid;
+  code{
+    display: block;
+    span:last-child{
+      float: left;
+    }
+  }
+}

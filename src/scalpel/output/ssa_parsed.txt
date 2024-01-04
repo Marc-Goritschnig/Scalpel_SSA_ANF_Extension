@@ -1,2 +1,61 @@
+proc IsEasyChairQuery_0(input)
+{
+  L3: 
+    # (1) check that input contains "/" followed by anything not;
+    # containing "/" and containing "EasyChair";
+    #-SSA-Attribute;
+    _SSA_0_0 <- _obj2_rindex(input, '/');
+    lastSlash_0 <- _SSA_0_0;
+    if _Lt(lastSlash_0, 0) then goto L4
+    else goto L5;
+
+  L4: 
+    ret False;
+
+  L5: 
+    rest_0 <- _List_Slice_L(input, _Add(lastSlash_0, 1));
+    if _NotIn('EasyChair', rest_0) then goto L7
+    else goto L8;
+
+  L7: 
+    ret False;
+
+  L8: 
+    # (2) Check that input starts with "http://";
+    #-SSA-Attribute;
+    _SSA_2_0 <- _obj2_startswith(input, 'http://');
+    if _Not(_SSA_2_0) then goto L10
+    else goto L11;
+
+  L10: 
+    ret False;
+
+  L11: 
+    # (3) Take the string between "http://" and the last "/".;
+    # if it starts with "www." strip the "www." off;
+    t_0 <- _List_Slice_LU(input, len('http://'), lastSlash_0);
+    #-SSA-Attribute;
+    _SSA_1_0 <- _obj2_startswith(t_0, 'www.');
+    if _SSA_1_0 then goto L13
+    else goto L14;
+
+  L13: 
+    t_1 <- _LSD_Get(t_0, len('www.'));
+    goto L14;
+
+  L14: 
+    t_2 <- PHI(t_0, t_1);
+    # (4) Check that after stripping we have either "live.com";
+    # or "google.com";
+    if _And(_NotEq(t_2, 'live.com'), _NotEq(t_2, 'google.com')) then goto L15
+    else goto L16;
+
+  L15: 
+    ret False;
+
+  L16: 
+    # s survived all checks;
+    ret True;
+}
 L1: 
-  a_0 <- _Add(1, 4);
+  IsEasyChairQuery_0('test');

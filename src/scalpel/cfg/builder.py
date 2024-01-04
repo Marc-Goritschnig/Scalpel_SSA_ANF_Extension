@@ -119,6 +119,7 @@ class CFGBuilder(ast.NodeVisitor):
         self.visit(tree)
         visited = []
         self.clean_cfg(self.cfg.entryblock, visited)
+        self.cfg.ast_node = tree
 
         if flattened:
             self.cfg = self._flatten_cfg(self.cfg)
@@ -251,12 +252,14 @@ class CFGBuilder(ast.NodeVisitor):
         self.cfg.functioncfgs[(enclosing_block_id, node.name)] = func_builder.build(
             node.name, func_body, asynchr, self.current_id
         )
+        self.cfg.functioncfgs[(enclosing_block_id, node.name)].ast_node = node
+
 
         def get_arg_names(argument_node):
             arg_names = []
             for node in ast.walk(argument_node):
                 if isinstance(node, ast.arg):
-                    arg_names.append(node.arg)
+                    arg_names.append(node)
             return arg_names
 
         self.cfg.function_args[(enclosing_block_id, node.name)] = get_arg_names(

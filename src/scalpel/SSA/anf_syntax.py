@@ -102,11 +102,24 @@ def reset():
 
 class ANFNode:
     def __init__(self, ssa_node: SSANode = None):
+        self.init(ssa_node)
+
+    def init(self, ssa_node: SSANode = None):
         self.prov_info = ''
         self.pos_info = None
         if ssa_node is not None:
             if ssa_node.pos_info is not None:
                 self.pos_info = ssa_node.pos_info
+            else:
+                positions = find_child_positions(ssa_node)
+                if len(positions) > 0:
+                    pos = Position(None)
+                    for p in positions:
+                        pos.lineno = min(pos.lineno, p.lineno)
+                        pos.end_lineno = max(pos.end_lineno, p.end_lineno)
+                        pos.col_offset = min(pos.col_offset, p.col_offset)
+                        pos.end_col_offset = max(pos.end_col_offset, p.end_col_offset)
+                    self.pos_info = pos
 
     def print(self, lvl = 0):
         return 'not implemented'
@@ -128,11 +141,11 @@ class ANFNode:
     def print_prov_ext(self):
         prov = ''
         if self.pos_info is not None:
-            prov += str(self.pos_info)
+            prov += PROV_INFO_EXT_CHAR + str(self.pos_info)
+        else:
+            prov += PROV_INFO_EXT_CHAR
         if self.prov_info != '':
-            prov += self.prov_info
-        if prov != '':
-            prov = PROV_INFO_EXT_CHAR + prov
+            prov += PROV_INFO_EXT_CHAR + self.prov_info
         return prov
 
 class ANF_EV(ANFNode):
@@ -234,7 +247,7 @@ class ANF_E_LET(ANF_E):
         return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term2.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         name = self.var.name
@@ -263,12 +276,13 @@ class ANF_E_LETREC(ANF_E):
         # assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
         add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
         line_sep = '\n' if add_new_line else ''
-        return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + line_sep + self.term1.print(lvl + 1) + '\n' + get_indentation(lvl) + 'in\n' + self.term2.print(lvl + 1)
+        line_sep2 = '\n' + get_indentation(lvl) if add_new_line else ' '
+        return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + line_sep + self.term1.print(lvl + 1) + line_sep2 + 'in\n' + self.term2.print(lvl + 1)
 
     def get_prov_info(self, prov_info):
         add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
         line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
-        return PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + '\n\n' + self.term2.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + line_sep + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if re.match(block_label_regex, self.var.name):
@@ -319,7 +333,7 @@ class ANF_E_IF(ANF_E):
         return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return PROV_INFO_SPLIT_CHAR + self.test.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term_if.get_prov_info(None) + '\n\n' + self.term_else.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.test.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + '\n' + self.term_if.get_prov_info(None) + '\n\n' + self.term_else.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         parsed_blocks_buffer = parsed_blocks.copy()
@@ -394,7 +408,10 @@ class ANF_V_CONST(ANF_V):
         self.value: str = value
 
     def print(self, lvl = 0, prov_info: str = ''):
-        return f"{self.value}"
+        if self.prov_info == 'RET':
+            return get_indentation(lvl) + f"{self.value}"
+        else:
+            return f"{self.value}"
 
     def get_prov_info(self, prov_info):
         return 'c' + self.print_prov_ext()
@@ -470,8 +487,8 @@ class ANF_E_FUNC(ANF_E):
         add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(self.term, ANF_E_COMM)
         line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
         if self.input_var is None:
-            return PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
-        return PROV_INFO_SPLIT_CHAR + self.input_var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
+            return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.input_var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0, print_variables=True):
         if not print_variables:
@@ -514,7 +531,8 @@ def SA(ssa_ast: SSA_AST):
     ssa_ast_global = ssa_ast
 
     # Transform all procedures of the SSA AST and put the call of the first block as inner most term
-    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + str(get_first_block_in_proc(ssa_ast.blocks).label.label)))))
+    first_block = get_first_block_in_proc(ssa_ast.blocks)
+    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + str(first_block.label.label)), ssa_node=first_block)))
 
 
 # Transforms a list of procedures putting the inner_term inside the innermost let/rec
@@ -531,20 +549,24 @@ def SA_PS(ps: [SSA_P], inner_term):
 
         args = p.args[::-1]
         while len(args) > 0:
-            first_term = ANF_E_FUNC(SA_V(args[0]), first_term)
+            first_term = ANF_E_FUNC(SA_V(args[0]), first_term, ssa_node=p)
             args = args[1:]
 
-        let_rec = ANF_E_LETREC(SA_V(p.name), first_term, inner_term)
+        v = SA_V(p.name)
+        v.init(ssa_node=p)
+        let_rec = ANF_E_LETREC(v, first_term, inner_term, ssa_node=p)
     # If we have still more than one procedure we return a letrec of this proc using a recursive call to build the other procs as inner term
     else:
         first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
 
         args = p.args
         while len(args) > 0:
-            first_term = ANF_E_FUNC(SA_V(args[0]), first_term)
+            first_term = ANF_E_FUNC(SA_V(args[0]), first_term, ssa_node=p)
             args = args[1:]
 
-        let_rec = ANF_E_LETREC(SA_V(p.name), first_term, SA_PS(ps[1:], inner_term))
+        v = SA_V(p.name)
+        v.init(ssa_node=p)
+        let_rec = ANF_E_LETREC(v, first_term, SA_PS(ps[1:], inner_term), ssa_node=p)
 
     return let_rec
 
@@ -558,19 +580,19 @@ def SA_BS(bs: [SSA_B], inner_call):
 
     # Create self containing functions to build lambda functions in each other. leading to have functions with multiple variables
     if len(block_vars) > 0:
-        func = ANF_E_FUNC(block_vars[0], SA_ES(b, b.terms))
+        func = ANF_E_FUNC(block_vars[0], SA_ES(b, b.terms), ssa_node=b)
         block_vars = block_vars[1:]
 
         while len(block_vars) > 0:
-            func = ANF_E_FUNC(block_vars[0], func)
+            func = ANF_E_FUNC(block_vars[0], func, ssa_node=b)
             block_vars = block_vars[1:]
     else:
         func = SA_ES(b, b.terms)
 
     if len(bs) == 1:
-        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, inner_call)
+        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, inner_call, ssa_node=b)
     else:
-        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, SA_BS(bs[1:], inner_call))
+        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label), func, SA_BS(bs[1:], inner_call), ssa_node=b)
 
     return let_rec
 
@@ -585,7 +607,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
 
     if isinstance(term, SSA_E_ASS):
         unwrap_inner_applications_naming(term.value)
-        return unwrap_inner_applications_let_structure(term.value, ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:])))
+        return unwrap_inner_applications_let_structure(term.value, ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:]), ssa_node=term))
     if isinstance(term, SSA_E_GOTO):
         return ANF_E_APP([SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label))], ANF_V_CONST(block_identifier + term.label.label))
     if isinstance(term, SSA_E_ASS_PHI):
@@ -602,7 +624,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else])), True)
     if issubclass(type(term), SSA_V):
         unwrap_inner_applications_naming(term)
-        return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:])))
+        return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:]), ssa_node=term))
     if issubclass(type(term), SSA_E_COMM):
         return ANF_E_COMM(term.text, SA_ES(b, terms[1:]))
     return ANF_E_APP([], ANF_V_CONST('Not-Impl'))
@@ -612,12 +634,12 @@ def unwrap_inner_applications_let_structure(var: SSA_V, inner, unwrap_var: bool 
     if isinstance(var, SSA_V_FUNC_CALL):
         if unwrap_var:
             name = buffer_assignments[var]
-            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name, True), SA_V(var), inner, ssa_node=var))
+            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=var), SA_V(var), inner, ssa_node=var))
         else:
             for arg in var.args:
                 if isinstance(arg, SSA_V_FUNC_CALL):
                     name = buffer_assignments[arg]
-                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True), SA_V(arg), inner, ssa_node=arg))
+                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=arg), SA_V(arg), inner, ssa_node=arg))
     return inner
 
 
@@ -690,24 +712,26 @@ def parse_anf_from_text(code: str):
 # Convert an ANF code expression to ANF AST
 def parse_anf_e_from_code(code_words, info_words):
     next_word = code_words[0]
+    if len(info_words) > 1:
+        info1_parts = info_words[1].split(PROV_INFO_EXT_CHAR)
 
     # Found a comment within provenance information
     if len(code_words[0]) > 0 and code_words[0][0] == '#':
         return ANF_E_COMM(code_words[0], parse_anf_e_from_code(code_words[1:], info_words[1:]))
     if next_word == 'let':
-        variable = ANF_V_VAR(code_words[1], info_words[1] == 'bv')
+        variable = ANF_V_VAR(code_words[1], info1_parts[0] == 'bv')
         right = parse_anf_e_from_code(code_words[3:], info_words[3:])
         _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LET(variable, right, _in)
     if next_word == 'letrec':
-        variable = ANF_V_VAR(code_words[1], info_words[1] == 'bv')
+        variable = ANF_V_VAR(code_words[1], info1_parts[0] == 'bv')
         right = parse_anf_e_from_code(code_words[3:], info_words[3:])
         _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LETREC(variable, right, _in)
     if next_word == 'unit':
         return ANF_V_UNIT()
     if next_word == 'lambda' or next_word == 'λ':
-        variable = ANF_V_VAR(code_words[1], info_words[1] == 'bv')
+        variable = ANF_V_VAR(code_words[1], info1_parts[0] == 'bv')
         rest = code_words[3:]
         rest_info = info_words[3:]
         if code_words[1] == '.':
@@ -748,7 +772,10 @@ def parse_anf_v_from_code(code_word: str, info_word_with_prov: str):
     if info_word.startswith('f'):
         n = ANF_E_APP([], parse_anf_v_from_code(code_word, info_word[1:]))
     if n is not None and len(info_word_parts) > 1:
-        n.prov_info = info_word_parts[1]
+        n.prov_info = info_word_parts[len(info_word_parts) - 1]
+        # The found info is not prov info but position info
+        if ':' in n.prov_info:
+            n.prov_info = ''
     return n
 
 # Get the position of the next part belonging to the given one
@@ -768,103 +795,6 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
             break
 
     return parse_anf_e_from_code(code_words[idx + 1:], info_words[idx + 1 + comment_offset:])
-
-
-def parse_anf_to_ssa(anf_ast):
-    stmts, blocks, procs = parse_anf_to_ssa2(anf_ast)
-    return SSA_AST(procs, blocks)
-
-
-def parse_anf_to_ssa2(term):
-    global block_phi_assignment_vars
-    if isinstance(term, ANF_E_LETREC):
-        if isinstance(term.var, ANF_V_VAR):
-            name = term.var.name
-            if re.match(block_label_regex, name):
-                stmts1, blocks1, procs1 = parse_anf_to_ssa2(term.term1.term)
-                stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
-
-                # Replace single constants which are return values with a SSA RET object
-                for idx, st in enumerate(stmts1):
-                    if isinstance(st, SSA_V_CONST):
-                        stmts1[idx] = SSA_E_RET(st)
-                for idx, st in enumerate(stmts1):
-                    if isinstance(st, SSA_V_CONST):
-                        stmts1[idx] = SSA_E_RET(st)
-
-                # The first innermost letrec got a simple function call in its "in" term which is artificially added from SSA to ANF to call the first Block and therefore not needed
-                if isinstance(term.term2, ANF_E_APP):
-                    if re.match(block_label_regex, term.term2.name.name):
-                        stmts2, blocks2, procs2 = [], [], []
-                phi_ass = []
-                if name in block_phi_assignment_vars:
-                    for var in block_phi_assignment_vars[name]:
-                        max_idx = 0
-                        for arg in block_phi_assignment_vars[name][var]:
-                            idx = int(arg[arg.rfind('_')+1:])
-                            max_idx = max(max_idx, idx)
-                        phi_ass += [SSA_E_ASS_PHI(SSA_V_VAR(var + '_' + str(max_idx+1)), [SSA_V_VAR(arg) for arg in block_phi_assignment_vars[name][var]])]
-                return [], [SSA_B(SSA_L(term.var.name[1:]), phi_ass + stmts1 + stmts2, False)] + blocks1 + blocks2, procs1 + procs2
-
-        # Get all functions with 1 parameter at the start of the letrec describing the procs input variables
-        vars = get_function_parameter_recursive(term.term1)
-        next_non_func_term = get_next_non_function_term(term.term1)
-        stmts1, blocks1, procs1 = parse_anf_to_ssa2(next_non_func_term)
-        stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
-
-        # Replace single constants which are return values with a SSA RET object
-        for idx, st in enumerate(stmts1):
-            if isinstance(st, SSA_V_CONST):
-                stmts1[idx] = SSA_E_RET(st)
-        for idx, st in enumerate(stmts1):
-            if isinstance(st, SSA_V_CONST):
-                stmts1[idx] = SSA_E_RET(st)
-
-        return [], blocks2, [SSA_P(SSA_L(term.var.print(0, None)), [SSA_V_VAR(var) for var in vars], blocks1)] + procs1 + procs2
-    elif isinstance(term, ANF_E_LET):
-        name = term.var.print()
-        # Parse the right assignment side first and check if the left side is a buffer variable
-        stmts1, _, _ = parse_anf_to_ssa2(term.term1)
-        ass = [SSA_E_ASS(SSA_V_VAR(name), stmts1[0])]
-        # if we have a buffer variable we keep track of it and do not include the assignment in the returned statements
-        #if term.var.is_buffer_var:
-        if term.var.is_buffer_var:
-            buffer_assignments_anf_ssa[name] = stmts1[0]
-            ass = []
-        # Parse the following statements
-        stmts2, blocks2, procs2 = parse_anf_to_ssa2(term.term2)
-        if name == '_':
-            return stmts1 + stmts2, blocks2, procs2
-        return ass + stmts2, blocks2, procs2
-    elif isinstance(term, ANF_E_APP):
-        name = term.name.print()
-        if re.match(block_label_regex, name):
-            if name not in block_phi_assignment_vars:
-                block_phi_assignment_vars[name] = {}
-            for arg in term.params:
-                arg_name = get_name_from_buffer(arg.print())
-                base = arg_name[0:arg_name.rfind('_')]
-                if base not in block_phi_assignment_vars[name]:
-                    block_phi_assignment_vars[name][base] = []
-                block_phi_assignment_vars[name][base].append(arg_name)
-            return [SSA_E_GOTO(SSA_L(name[1:]))], [], []
-        return [SSA_V_FUNC_CALL(SSA_V_VAR(name), [SSA_V_VAR(get_name_from_buffer(arg.print())) for arg in term.params])], [], []
-    elif isinstance(term, ANF_E_IF):
-        stmts1, _, _ = parse_anf_to_ssa2(term.term_if)
-        stmts2, _, _ = parse_anf_to_ssa2(term.term_else)
-        stmts1 = stmts1[0] if len(stmts1) > 0 else SSA_E_RET(None)
-        stmts2 = stmts2[0] if len(stmts2) > 0 else SSA_E_RET(None)
-        return [SSA_E_IF_ELSE(parse_anf_to_ssa2(term.test)[0][0], stmts1, stmts2)], [], []
-    elif isinstance(term, ANF_V_VAR):
-        if term.name in buffer_assignments_anf_ssa:
-            return [buffer_assignments_anf_ssa[term.name]], [], []
-        return [SSA_V_VAR(term.name)], [], []
-    elif isinstance(term, ANF_E_FUNC):
-        return [], [], []
-    elif isinstance(term, ANF_V_CONST):
-        return [SSA_V_CONST(term.value)], [], []
-    elif isinstance(term, ANF_V_UNIT):
-        return [], [], []
 
 
 def get_name_from_buffer(name):

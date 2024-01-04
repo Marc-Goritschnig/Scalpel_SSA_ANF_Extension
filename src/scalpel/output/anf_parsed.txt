@@ -1,5 +1,73 @@
-letrec L1 = 
-    let a_0 = _Add 1 4 in 
-        unit
-in
-    L1 
+letrec IsEasyChairQuery_0 = lambda input . 
+    letrec L3 = 
+        # (1) check that input contains "/" followed by anything not
+        # containing "/" and containing "EasyChair"
+        #-SSA-Attribute
+        let _SSA_0_0 = _obj2_rindex input '/' in 
+            let lastSlash_0 = _SSA_0_0 in 
+                let %_0 = _Lt lastSlash_0 0 in 
+                    if %_0 then 
+                        L4  
+                    else
+                        L5 
+    in
+        letrec L4 =             False in
+            letrec L5 = 
+                let %_1 = _Add lastSlash_0 1 in 
+                    let rest_0 = _List_Slice_L input %_1 in 
+                        let %_2 = _NotIn 'EasyChair' rest_0 in 
+                            if %_2 then 
+                                L7  
+                            else
+                                L8 
+            in
+                letrec L7 =                     False in
+                    letrec L8 = 
+                        # (2) Check that input starts with "http://"
+                        #-SSA-Attribute
+                        let _SSA_2_0 = _obj2_startswith input 'http://' in 
+                            let %_3 = _Not _SSA_2_0 in 
+                                if %_3 then 
+                                    L10  
+                                else
+                                    L11 
+                    in
+                        letrec L10 =                             False in
+                            letrec L11 = 
+                                # (3) Take the string between "http://" and the last "/".
+                                # if it starts with "www." strip the "www." off
+                                let %_4 = len 'http://' in 
+                                    let t_0 = _List_Slice_LU input %_4 lastSlash_0 in 
+                                        #-SSA-Attribute
+                                        let _SSA_1_0 = _obj2_startswith t_0 'www.' in 
+                                            if _SSA_1_0 then 
+                                                L13  
+                                            else
+                                                L14 t_0
+                            in
+                                letrec L13 = 
+                                    let %_5 = len 'www.' in 
+                                        let t_1 = _LSD_Get t_0 %_5 in 
+                                            L14 t_1
+                                in
+                                    letrec L14 = lambda t_2 . 
+                                        # (4) Check that after stripping we have either "live.com"
+                                        # or "google.com"
+                                        let %_8 = _NotEq t_2 'google.com' in 
+                                            let %_7 = _NotEq t_2 'live.com' in 
+                                                let %_6 = _And %_7 %_8 in 
+                                                    if %_6 then 
+                                                        L15  
+                                                    else
+                                                        L16  in
+                                        letrec L15 =                                             False in
+                                            letrec L16 = 
+                                                # s survived all checks
+                                                True
+                                            in
+                                                L3  in
+    letrec L1 = 
+        let _ = IsEasyChairQuery_0 'test' in 
+            unit
+    in
+        L1 
