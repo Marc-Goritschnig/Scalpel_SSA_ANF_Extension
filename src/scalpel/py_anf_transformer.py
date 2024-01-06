@@ -32,12 +32,14 @@ parse_back = False
 only_parse_back = False
 output_syntax = 0
 no_output_files = False
+no_pos = False
+print_prov_info = False
 
 def transform():
     # Print cfg into file
-    if print_CFG_graph:
-        cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')
-        cfg.build_visual('./output/exampleCFG', 'pdf')
+    #if print_CFG_graph:
+    #    cfg = CFGBuilder().build_from_file('example.py', './cfg_example.py')
+    #    cfg.build_visual('./output/exampleCFG', 'pdf')
 
     # Check if output folder exists
     if not os.path.exists(output_folder):
@@ -63,23 +65,29 @@ def transform():
         ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
         if output_syntax == 0:
             ssa_ast.enable_print_ascii()
+
         if debug_mode:
             print("Transformed SSA tree printed:")
             print(trim_double_spaces(ssa_ast.print(0)))
             print('\n\n\n')
 
         # Create an ANF AST from SSA AST
-        anf_ast = parse_ssa_to_anf(ssa_ast, debug_mode)
+        anf_ast = parse_ssa_to_anf(ssa_ast, debug_mode, no_pos)
         if output_syntax == 0:
             anf_ast.enable_print_ascii()
+
+        anf_w_prov = print_anf_with_prov_info(anf_ast)
+
 
         if debug_mode:
             print("Transformed AST tree printed:")
 
         if not parse_back:
-            print(trim_double_spaces(anf_ast.print(0)))
+            if print_prov_info:
+                print(anf_w_prov)
+            else:
+                print(trim_double_spaces(anf_ast.print(0)))
 
-        anf_w_prov = trim_double_spaces(print_anf_with_prov_info(anf_ast))
         if debug_mode:
             print('\n\n\n')
             print("Transformed AST tree with provenance printed:")
@@ -197,11 +205,13 @@ if __name__ == '__main__':
     # parser.add_argument("--anf_out_name", '--anf', default='anf_parsed.txt', type=str, help="The filename for the generated ANF code")
     # parser.add_argument("--anf_with_prov_out_name", '-anf_plus', default='anf_parsed_with_prov_info.txt', type=str, help="The filename for the generated ANF code including provenance information")
     parser.add_argument('-d', '--debug_mode', action='store_true', help="Shows more information and logs when True")
-    parser.add_argument('-c', '--save_cfg', action='store_true', help="Saves the generated CFG in DOT format")
-    parser.add_argument('-b', '--parse_back', action='store_true', help="When True the transformation back will be done")
-    parser.add_argument('-p', '--only_parse_back', action='store_true', help="When True the input file will be interpreted as ANF code with provenance information and parsed back into Python code")
+    # parser.add_argument('-c', '--save_cfg', action='store_true', help="Saves the generated CFG in DOT format")
+    parser.add_argument('-b', '--parse_back', action='store_true', help="When given the transformation back will be done and the result will be printed")
+    parser.add_argument('-p', '--only_parse_back', action='store_true', help="When given the input file will be interpreted as ANF code with provenance information and parsed back into Python code")
     parser.add_argument('-s', '--output_syntax', default=0, type=int, help="The format in which the output is printed (0...ascii, 1...code)")
-    parser.add_argument('-n', '--no_output_files', action='store_true', help="When True the library will save no files and only print onto the console")
+    parser.add_argument('-n', '--no_output_files', action='store_true', help="When given the library will save no files and only print onto the console")
+    parser.add_argument('--print_prov_info', action='store_true', help="When given the library will print the anf together with its provenance info to the console")
+    parser.add_argument('--no_pos', action='store_true', help="When given the library will not track positional info of variables etc.")
 
     args = parser.parse_args()
 
@@ -212,15 +222,17 @@ if __name__ == '__main__':
     no_output_files = args.no_output_files
     python_code_path = args.input_path
     debug_mode = str2bool(args.debug_mode)
-    print_CFG_graph = str2bool(args.save_cfg)
+    #print_CFG_graph = str2bool(args.save_cfg)
     parse_back = str2bool(args.parse_back)
     only_parse_back = str2bool(args.only_parse_back)
     output_syntax = args.output_syntax
+    no_pos = args.no_pos
+    print_prov_info = args.print_prov_info
 
-    if print_CFG_graph:
-        from staticfg import CFGBuilder
-        graphviz_path = 'C:/Program Files/Graphviz/bin'
-        os.environ["PATH"] += os.pathsep + graphviz_path
+    #if print_CFG_graph:
+    #    from staticfg import CFGBuilder
+    #    graphviz_path = 'C:/Program Files/Graphviz/bin'
+    #    os.environ["PATH"] += os.pathsep + graphviz_path
 
     transform()
 

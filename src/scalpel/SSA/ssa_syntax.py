@@ -114,7 +114,6 @@ class Position:
                     self.col_offset = min(self.col_offset, p.col_offset)
                     self.end_col_offset = max(self.end_col_offset, p.end_col_offset)
         else:
-            print('No Line number found')
             self.lineno = 99999
             self.col_offset = 99999
             self.end_lineno = 0
@@ -190,6 +189,7 @@ class SSA_V_CONST(SSA_V):
     def parse_to_python(self, lvl):
         return map_ssa_to_python(self.value)
 
+
 class SSA_V_VAR(SSA_V):
     def __init__(self, name: str, pos_info: Position = None):
         super().__init__(pos_info=pos_info)
@@ -203,6 +203,20 @@ class SSA_V_VAR(SSA_V):
 
     def parse_to_python(self, lvl):
         return map_ssa_to_python(self.name)
+
+
+class SSA_E(SSANode):
+    def __init__(self, pos_info: Position = None):
+        super().__init__(pos_info=pos_info)
+
+    def print(self, lvl):
+        return ""
+
+    def print_latex(self, lvl):
+        return ""
+
+    def parse_to_python(self, lvl):
+        return ""
 
 
 class SSA_V_FUNC_CALL(SSA_V):
@@ -220,20 +234,6 @@ class SSA_V_FUNC_CALL(SSA_V):
 
     def parse_to_python(self, lvl):
         return f"{self.name.parse_to_python(lvl) + print_args_to_python(self.args, lvl)}"
-
-
-class SSA_E(SSANode):
-    def __init__(self, pos_info: Position = None):
-        super().__init__(pos_info=pos_info)
-
-    def print(self, lvl):
-        return ""
-
-    def print_latex(self, lvl):
-        return ""
-
-    def parse_to_python(self, lvl):
-        return ""
 
 
 class SSA_E_ASS_PHI(SSA_E):

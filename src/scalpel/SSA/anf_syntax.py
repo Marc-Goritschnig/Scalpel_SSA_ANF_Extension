@@ -7,8 +7,11 @@ from scalpel.SSA.ssa_syntax import *
 
 import re
 
+from scalpel.functions import trim_double_spaces
+
 font = {'lambda_sign': 'λ'}
 debug_mode = False
+no_pos_tracking = False
 comment_separator = '--'
 COMMENT_MARKER = '#'
 buffer_var_name = '%_'
@@ -140,7 +143,7 @@ class ANFNode:
 
     def print_prov_ext(self):
         prov = ''
-        if self.pos_info is not None:
+        if not no_pos_tracking and self.pos_info is not None:
             prov += PROV_INFO_EXT_CHAR + str(self.pos_info)
         else:
             prov += PROV_INFO_EXT_CHAR
@@ -223,7 +226,7 @@ class ANF_E_COMM(ANF_E):
         return get_indentation(lvl) + f"{self.text}\n{self.term.print(lvl)}"
 
     def get_prov_info(self, prov_info):
-        return '\n' + self.term.get_prov_info(None)
+        return self.print_prov_ext() + '\n' + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         out = self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
@@ -518,9 +521,10 @@ def remove_indentation(code, i):
     return new_code
 
 
-def parse_ssa_to_anf(ssa: SSA_AST, debug: bool):
-    global debug_mode
+def parse_ssa_to_anf(ssa: SSA_AST, debug: bool, no_pos: bool):
+    global debug_mode, no_pos_tracking
     reset()
+    no_pos_tracking = no_pos
     debug_mode = debug
     return SA(ssa)
 
@@ -626,7 +630,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         unwrap_inner_applications_naming(term)
         return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:]), ssa_node=term))
     if issubclass(type(term), SSA_E_COMM):
-        return ANF_E_COMM(term.text, SA_ES(b, terms[1:]))
+        return ANF_E_COMM(term.text, SA_ES(b, terms[1:]), ssa_node=term)
     return ANF_E_APP([], ANF_V_CONST('Not-Impl'))
 
 
@@ -681,7 +685,7 @@ def get_buffer_variable():
 
 # Print the ANF tree including the provenance information right aligned to the code per line
 def print_anf_with_prov_info(anf_parent: ANFNode):
-    out = anf_parent.print()
+    out = trim_double_spaces(anf_parent.print())
     prov = anf_parent.get_prov_info(None)
     max_chars = max([len(line) + line.count('\t') * 3 for line in out.split('\n')]) + 2
     return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + comment_separator + info for line, info in zip(out.split('\n'), prov.split('\n'))])
