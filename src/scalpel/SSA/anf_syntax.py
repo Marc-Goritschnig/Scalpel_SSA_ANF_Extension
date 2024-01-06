@@ -279,13 +279,14 @@ class ANF_E_LETREC(ANF_E):
         # assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
         add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
         line_sep = '\n' if add_new_line else ''
-        line_sep2 = '\n' + get_indentation(lvl) if add_new_line else ' '
+        line_sep2 = '\n' + get_indentation(lvl)
         return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + line_sep + self.term1.print(lvl + 1) + line_sep2 + 'in\n' + self.term2.print(lvl + 1)
 
     def get_prov_info(self, prov_info):
         add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
         line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + line_sep + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
+        line_sep2 = '\n'
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + line_sep2 + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if re.match(block_label_regex, self.var.name):

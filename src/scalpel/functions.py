@@ -60,6 +60,34 @@ def insert_comment_rec(c, stmts):
     return False
 
 
+
+# Get the variables global unique name, considers parent variables to be used
+def get_global_unique_name(var_name, parent_vars, used_var_names):
+    if var_name in parent_vars:
+        return var_name
+    idx = 0
+    appendix = ""
+    if var_name not in used_var_names:
+        return var_name
+    while (var_name + appendix) in used_var_names:
+        appendix = "_" + str(idx)
+        idx += 1
+    return var_name + appendix
+
+
+def get_global_unique_name_with_update(var_name, used_var_names):
+    idx = 0
+    appendix = ""
+    if var_name not in used_var_names:
+        used_var_names[var_name] = 0
+        return var_name
+    while (var_name + appendix) in used_var_names:
+        appendix = "_" + str(idx)
+        idx += 1
+    used_var_names[var_name + appendix] = 0
+    return var_name + appendix
+
+
 #def custom_ast_parse(ast, source):
 #    ast_tree = ast.parse(source)
 #    fix_comment_positioning(ast, ast_tree)

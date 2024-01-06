@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from scalpel import ast_comments as ast
 from scalpel.core.mnode import MNode
 from scalpel.SSA.const import SSA
+from scalpel.functions import get_global_unique_name, get_global_unique_name_with_update
 
 debug_mode = True
 font = {'assign': '←',
@@ -55,6 +56,8 @@ addon_statements_per_block = {}
 
 block_phi_assignment_vars = {}
 buffer_assignments_ssa_py = {}
+
+global_variables_used = {}
 
 
 
@@ -491,7 +494,8 @@ def get_used_vars(vars_stored, constants):
             for var, idx in term_vars.items():
                 used_vars[var] = idx
     for tup in constants.keys():
-        used_vars[tup[0]] = tup[1]
+        if not isinstance(constants[tup], ast.FunctionDef):
+            used_vars[tup[0]] = tup[1]
     return used_vars
 
 
@@ -778,16 +782,16 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
     cfg = mnode.gen_cfg()
     m_ssa = SSA()
 
+    # Update the provenance info for the child cfgs (functions which have references to the parents variables)
+    prov_info = ProvInfo()
+
     # Compute the phi nodes of the main CFG
     ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names)
     # Parse the main CFG
     main_cfg_proc = PS_BS(ProvInfo(), sort_blocks(cfg.get_all_blocks()))
     # Update global tracking variables of used variable names etc for main CFG
     update_used_vars(ssa_results_stored, const_dict)
-
-    # Update the provenance info for the child cfgs (functions which have references to the parents variables)
-    prov_info = ProvInfo()
-    prov_info.parent_vars = get_used_vars(ssa_results_stored, const_dict)
+    prov_info.parent_vars.update(get_used_vars(ssa_results_stored, const_dict))
 
     # Parse all the functions cfgs
     procs = PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
@@ -830,6 +834,14 @@ def PS_PHI(curr_block):
 
 
 # Parse the given function cfgs and sub functions
+def try_get_used_name_of_function(name, const_dict):
+    for tup in const_dict.keys():
+        if isinstance(const_dict[tup], ast.FunctionDef):
+            if tup[0] == name:
+                return name + '_' + str(tup[1])
+    return None
+
+
 def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
     procs = []
@@ -840,20 +852,34 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
         if key in function_args:
             args = function_args[key]
 
-        # Compute the phi nodes of the current function CFG
-        ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars)
+        f_name = try_get_used_name_of_function(cfg.name, const_dict)
+        if f_name is None:
+            f_name = get_global_unique_name_with_update(cfg.name, used_var_names) + '_0'
+        #args_renamed = [get_global_unique_name_with_update(arg.arg, used_var_names) for arg in args]
+        #prov_info.parent_vars[arg] for arg in args_renamed
+        for arg in args:
+            if arg.arg in prov_info.parent_vars:
+                del prov_info.parent_vars[arg.arg]
 
-        # Parse the current functino CFG into SSA
-        procs.append(SSA_P(SSA_V_VAR(cfg.name + '_0', pos_info=Position(cfg.ast_node)), [SSA_V_VAR(arg.arg, pos_info=Position(arg)) for arg in args], PS_BS(prov_info, sort_blocks(cfg.get_all_blocks())), pos_info=Position(cfg.ast_node)))
+        # Compute the phi nodes of the current function CFG
+        ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars, function_vars=[arg.arg for arg in args])
+
+        parsed_blocks = PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))
+        fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), [SSA_V_VAR(get_global_unique_name_with_update(arg.arg, used_var_names) + '_0', pos_info=Position(arg)) for arg in args], parsed_blocks, pos_info=Position(cfg.ast_node))
 
         # Update the used variable names
         update_used_vars(ssa_results_stored, const_dict)
+
         prov_info = prov_info.copy()
-        prov_info.parent_vars = get_used_vars(ssa_results_stored, const_dict)
+        prov_info.parent_vars.update(get_used_vars(ssa_results_stored, const_dict))
 
         # If there are function in this function, parse those now
         if len(cfg.functioncfgs) > 0:
             procs += PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
+
+        # Parse the current functino CFG into SSA
+        procs.append(fun_proc)
+
 
     return procs
 
@@ -1100,7 +1126,7 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         pos = Position(stmt)
         return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.attr, pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)], pos_info=pos)
     elif isinstance(stmt, ast.Name):
-        name = get_global_unique_name(stmt.id, prov_info.parent_vars)
+        name = get_global_unique_name(stmt.id, prov_info.parent_vars, used_var_names)
         if is_load:
             if name in ssa_results_loads[curr_block.id][st_nr]:
                 var_list = [str(var) for var in list(ssa_results_loads[curr_block.id][st_nr][name])]
@@ -1134,20 +1160,6 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if debug_mode:
         print("No match found for statement: ", stmt)
     return stmt
-
-
-# Get the variables global unique name, considers parent variables to be used
-def get_global_unique_name(var_name, parent_vars):
-    if var_name in parent_vars:
-        return var_name
-    idx = 2
-    appendix = ""
-    if var_name not in used_var_names:
-        return var_name
-    while (var_name + appendix) in used_var_names:
-        appendix = "_" + str(idx)
-        idx += 1
-    return var_name + appendix
 
 
 # Recursively generate a call stack with ops and comparators
