@@ -482,8 +482,8 @@ class ANF_E_FUNC(ANF_E):
         add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(self.term, ANF_E_COMM)
         line_sep = '\n' if add_new_line else ''
         if self.input_var is None:
-            return f"{font['lambda_sign']} . {line_sep}{self.term.print(lvl)}"
-        return f"{font['lambda_sign']} {self.input_var.print(0)} . {line_sep}{self.term.print(lvl)}"
+            return get_indentation(lvl) + f"{font['lambda_sign']} . {line_sep}{self.term.print(lvl)}"
+        return get_indentation(lvl) + f"{font['lambda_sign']} {self.input_var.print(0)} . {line_sep}{self.term.print(lvl)}"
 
     def get_prov_info(self, prov_info):
         next_node = get_first_node_diff_than_comment(self.term)
