@@ -55,6 +55,9 @@ export class AppComponent {
       w = words[1];
     }
 
+    console.log(w);
+    console.log(words);
+
     let codeElement = document.getElementById('code');
 
     if (codeElement) {
@@ -150,8 +153,8 @@ export class AppComponent {
     for (const line of this.anfCodeLines) {
 
       if (line.match('^( )*#.*')){
-        let comm = line.substring(0, line.lastIndexOf('--'));
-        this.wordCollection.push([new Word(comm, new Position(null))]);
+        let parts = line.split('--');
+        this.wordCollection.push([new Word(parts[0], new Position(parts[1].split(';')[1]))]);
         continue;
       }
 
