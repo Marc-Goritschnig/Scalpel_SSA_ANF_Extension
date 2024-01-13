@@ -315,7 +315,7 @@ class ANF_E_LETREC(ANF_E):
 def get_function_parameter_recursive(next):
     if isinstance(next, ANF_E_FUNC):
         if next.input_var is not None:
-            return [next.input_var.parse_anf_to_python({}, [], [])] + get_function_parameter_recursive(next.term)
+            return get_function_parameter_recursive(next.term) + [next.input_var.parse_anf_to_python({}, [], [])]
     return []
 
 
@@ -552,7 +552,9 @@ def SA_PS(ps: [SSA_P], inner_term):
     if len(ps) == 1:
         first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
 
-        args = p.args[::-1]
+        # args = p.args[::-1] If arguments should be given in backwards order
+        # If so the back transformation function get_function_parameter_recursive must also be build in revers
+        args = p.args
         while len(args) > 0:
             first_term = ANF_E_FUNC(SA_V(args[0]), first_term, ssa_node=p)
             args = args[1:]

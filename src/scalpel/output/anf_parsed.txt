@@ -18,8 +18,8 @@ in
         in
             L3 
     in
-        letrec fun2_0 =             lambda a_1_0 . 
-            lambda b_1_0 . 
+        letrec fun2_0 =             lambda b_1_0 . 
+            lambda a_1_0 . 
             letrec L11 = 
                 let _ = print b_1_0 in 
                     let _ = print a_1_0 b_1_0 in 
