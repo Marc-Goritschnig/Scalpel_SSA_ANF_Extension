@@ -1,22 +1,35 @@
-letrec test_1 =     lambda a_0_0 . 
-    lambda b_0 . 
-    lambda c_0 . 
-    letrec L3 = 
-        let _ = print a_0_0 b_0 c_0 in 
-            #def test2(a, b, c):
-            #    print(a, b, c)
-            #print(a, b, c)
-            unit
+letrec fun3_0 =     lambda c_0_0 . 
+    lambda b_0_0 . 
+    lambda a_0_0 . 
+    letrec L5 = 
+        let _ = print 'a' in 
+            let _ = print a_0_0 b_0_0 in 
+                True
     in
-        L3 
+        L5 
 in
-    letrec L1 = 
-        let test_0 = 1 in 
-            let _ = print test_0 in 
-                let _ = test_1 1 2 3 in 
-                    let test_0_0 = 1 in 
-                        let a_0 = 1 in 
-                            let _ = print test_1 in 
-                                unit
+    letrec fun_0 =         lambda c_0 . 
+        lambda b_0 . 
+        lambda a_0 . 
+        letrec L3 = 
+            let _ = print 'a' in 
+                let _ = print a_0 b_0 in 
+                    True
+        in
+            L3 
     in
-        L1 
+        letrec fun2_0 =             lambda a_1_0 . 
+            lambda b_1_0 . 
+            letrec L11 = 
+                let _ = print b_1_0 in 
+                    let _ = print a_1_0 b_1_0 in 
+                        unit
+            in
+                L11 
+        in
+            letrec L1 = 
+                let _ = fun_0  in 
+                    let _ = fun2_0 1 in 
+                        unit
+            in
+                L1 

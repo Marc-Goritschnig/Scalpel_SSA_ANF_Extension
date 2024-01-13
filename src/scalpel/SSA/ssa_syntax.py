@@ -846,13 +846,14 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
     procs = []
 
+    parent_const_dict = const_dict.copy()
     for key in function_cfgs:
         cfg = function_cfgs[key]
         args = []
         if key in function_args:
             args = function_args[key]
 
-        f_name = try_get_used_name_of_function(cfg.name, const_dict)
+        f_name = try_get_used_name_of_function(cfg.name, parent_const_dict)
         if f_name is None:
             f_name = get_global_unique_name_with_update(cfg.name, used_var_names) + '_0'
         #args_renamed = [get_global_unique_name_with_update(arg.arg, used_var_names) for arg in args]

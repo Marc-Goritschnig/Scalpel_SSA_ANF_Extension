@@ -315,7 +315,7 @@ class ANF_E_LETREC(ANF_E):
 def get_function_parameter_recursive(next):
     if isinstance(next, ANF_E_FUNC):
         if next.input_var is not None:
-            return [next.input_var.print(0, None)] + get_function_parameter_recursive(next.term)
+            return [next.input_var.parse_anf_to_python({}, [], [])] + get_function_parameter_recursive(next.term)
     return []
 
 
