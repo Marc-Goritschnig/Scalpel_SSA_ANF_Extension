@@ -842,7 +842,7 @@ def try_get_used_name_of_function(name, const_dict):
     return None
 
 
-def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
+def PS_FS(prov_info, function_cfgs, function_args, m_ssa, parent_fun_name=None):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict
     procs = []
 
@@ -868,6 +868,8 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars, function_vars=[arg.arg for arg in args])
 
         parsed_blocks = PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))
+        if parent_fun_name is not None:
+            parsed_blocks[0].terms = [SSA_E_COMM('#-SSA-WithinFun-' + parent_fun_name)] + parsed_blocks[0].terms
         fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), ssa_args, parsed_blocks, pos_info=Position(cfg.ast_node))
 
         # Update the used variable names
@@ -878,7 +880,7 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
 
         # If there are function in this function, parse those now
         if len(cfg.functioncfgs) > 0:
-            procs += PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa)
+            procs += PS_FS(prov_info, cfg.functioncfgs, cfg.function_args, m_ssa, cfg.name)
 
         # Parse the current functino CFG into SSA
         procs.append(fun_proc)
@@ -888,7 +890,7 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
 
 
 # Parse a list of blocks from Python AST into SSA AST
-def PS_BS(prov_info, blocks):
+def PS_BS(prov_info, blocks) -> [SSA_B]:
     blocks_parsed = []
 
     i = 0

@@ -2,6 +2,7 @@ letrec fun3_0 =     lambda c_2 .
     lambda b_1 . 
     lambda a_3 . 
     letrec L5 = 
+        #-SSA-WithinFun-fun
         let _ = print 'a' in 
             let _ = print a_3 b_1 in 
                 True
@@ -23,6 +24,7 @@ in
             lambda b_4 . 
             lambda a_7 . 
             letrec L15 = 
+                #-SSA-WithinFun-fun3
                 let _ = print 'a' in 
                     let _ = print a_7 b_4 in 
                         True
@@ -33,6 +35,7 @@ in
                 lambda b_3 . 
                 lambda a_5 . 
                 letrec L13 = 
+                    #-SSA-WithinFun-fun2
                     let a_6 = _Mult a_5 a_5 in 
                         let _ = print 'a' in 
                             let _ = print a_6 b_3 in 
@@ -44,6 +47,7 @@ in
                     lambda b_5 . 
                     lambda a_8 . 
                     letrec L21 = 
+                        #-SSA-WithinFun-fun2
                         let _ = print 'a' in 
                             let _ = print a_8 b_5 in 
                                 True

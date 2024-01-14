@@ -826,6 +826,39 @@ def post_processing_anf_to_python(code):
         if '#-SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
             skip = 1
+        elif line_strip.startswith('#-SSA-WithinFun-'):
+            fun_name = lines[i].replace('#-SSA-WithinFun-', '').strip()
+            fun_end_idx = 0
+            j = 2
+            while not re.match(r'^ *def ' + fun_name + '.*', lines[i + j]):
+                j += 1
+                if i + j >= len(lines):
+                    break
+                line_indentation = len(re.findall(r"^ *", lines[i + j])[0])
+                if line_indentation == 0 and fun_end_idx == 0:
+                    fun_end_idx = i + j - 1
+
+            if i + j < len(lines):
+                indentation = len(re.findall(r"^ *", lines[i + j])[0])
+
+                j2 = 2
+                while len(re.findall(r"^ *", lines[i + j + j2])[0]) > indentation and not re.match(r'^ *def ', lines[i + j + j2]):
+                    j2 += 1
+                    if i + j + j2 >= len(lines):
+                        break
+                if i + j + j2 < len(lines):
+                    target_indentation = indentation + 4
+                    if fun_end_idx == 0:
+                        lines = lines[i + j:i+j+j2-1] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+j-1]] + lines[i+j+j2:]
+                    else:
+                        lines = lines[i + fun_end_idx:i+j+j2-1] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+fun_end_idx-1]] + lines[i+j+j2:]
+                    x = '\n'.join(lines)
+                    y = '\n'.join(output.split('\n')[:-2])
+                    return '\n'.join(output.split('\n')[:-2]) + post_processing_anf_to_python('\n'.join(lines))
+                else:
+                    output += line + '\n'
+            else:
+                output += line + '\n'
         elif '#-SSA-ClassStart' in line:
             j = 1
             while not lines[i + j].startswith('#-SSA-ClassEnd'):

@@ -1,6 +1,7 @@
 proc fun3_0(a_3, b_1, c_2)
 {
   L5: 
+    #-SSA-WithinFun-fun;
     print('a');
     print(a_3, b_1);
     ret True;
@@ -18,6 +19,7 @@ proc fun_0(a_2, b_0, c_1)
 proc fun31_0(a_7, b_4, c_4)
 {
   L15: 
+    #-SSA-WithinFun-fun3;
     print('a');
     print(a_7, b_4);
     ret True;
@@ -26,6 +28,7 @@ proc fun31_0(a_7, b_4, c_4)
 proc fun3_1(a_5, b_3, c_3)
 {
   L13: 
+    #-SSA-WithinFun-fun2;
     a_6 <- _Mult(a_5, a_5);
     print('a');
     print(a_6, b_3);
@@ -35,6 +38,7 @@ proc fun3_1(a_5, b_3, c_3)
 proc fun4_0(a_8, b_5, c_5)
 {
   L21: 
+    #-SSA-WithinFun-fun2;
     print('a');
     print(a_8, b_5);
     ret True;
