@@ -1,25 +1,55 @@
-proc fun3_0(a_0_0, b_0_0, c_0_0)
+proc fun3_0(a_3, b_1, c_2)
 {
   L5: 
     print('a');
-    print(a_0_0, b_0_0);
+    print(a_3, b_1);
     ret True;
 }
 
-proc fun_0(a_0, b_0, c_0)
+proc fun_0(a_2, b_0, c_1)
 {
   L3: 
+    x_1 <- 2;
     print('a');
-    print(a_0, b_0);
+    print(a_2, b_0);
     ret True;
 }
 
-proc fun2_0(a_1_0, b_1_0)
+proc fun31_0(a_7, b_4, c_4)
+{
+  L15: 
+    print('a');
+    print(a_7, b_4);
+    ret True;
+}
+
+proc fun3_1(a_5, b_3, c_3)
+{
+  L13: 
+    a_6 <- _Mult(a_5, a_5);
+    print('a');
+    print(a_6, b_3);
+    ret True;
+}
+
+proc fun4_0(a_8, b_5, c_5)
+{
+  L21: 
+    print('a');
+    print(a_8, b_5);
+    ret True;
+}
+
+proc fun2_0(a_4, b_2)
 {
   L11: 
-    print(b_1_0);
-    print(a_1_0, b_1_0);
+    print(b_2);
+    print(a_4, b_2);
 }
 L1: 
+  x_0 <- 1;
+  a_0 <- 1;
+  a_1 <- 2;
+  c_0 <- 2;
   fun_0();
   fun2_0(1);

@@ -196,10 +196,10 @@ class SSA:
                 ident_name_counter[get_global_unique_name(var, parent_vars, used_var_names)] = idx
 
         # init function argument idents
-        for var in function_vars:
-            if var in parent_vars:
-                del parent_vars[var]
-            ident_name_counter[get_global_unique_name(var, parent_vars, used_var_names)] = 0
+        #for var in function_vars:
+        #    if var in parent_vars:
+        #        del parent_vars[var]
+        #    ident_name_counter[get_global_unique_name(var, parent_vars, used_var_names)] = used_var_names[var]
 
         # constant assignment dict
         ident_const_dict = {}

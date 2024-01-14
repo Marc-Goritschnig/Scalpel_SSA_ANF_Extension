@@ -1,35 +1,71 @@
-letrec fun3_0 =     lambda c_0_0 . 
-    lambda b_0_0 . 
-    lambda a_0_0 . 
+letrec fun3_0 =     lambda c_2 . 
+    lambda b_1 . 
+    lambda a_3 . 
     letrec L5 = 
         let _ = print 'a' in 
-            let _ = print a_0_0 b_0_0 in 
+            let _ = print a_3 b_1 in 
                 True
     in
         L5 
 in
-    letrec fun_0 =         lambda c_0 . 
+    letrec fun_0 =         lambda c_1 . 
         lambda b_0 . 
-        lambda a_0 . 
+        lambda a_2 . 
         letrec L3 = 
-            let _ = print 'a' in 
-                let _ = print a_0 b_0 in 
-                    True
+            let x_1 = 2 in 
+                let _ = print 'a' in 
+                    let _ = print a_2 b_0 in 
+                        True
         in
             L3 
     in
-        letrec fun2_0 =             lambda b_1_0 . 
-            lambda a_1_0 . 
-            letrec L11 = 
-                let _ = print b_1_0 in 
-                    let _ = print a_1_0 b_1_0 in 
-                        unit
+        letrec fun31_0 =             lambda c_4 . 
+            lambda b_4 . 
+            lambda a_7 . 
+            letrec L15 = 
+                let _ = print 'a' in 
+                    let _ = print a_7 b_4 in 
+                        True
             in
-                L11 
+                L15 
         in
-            letrec L1 = 
-                let _ = fun_0  in 
-                    let _ = fun2_0 1 in 
-                        unit
+            letrec fun3_1 =                 lambda c_3 . 
+                lambda b_3 . 
+                lambda a_5 . 
+                letrec L13 = 
+                    let a_6 = _Mult a_5 a_5 in 
+                        let _ = print 'a' in 
+                            let _ = print a_6 b_3 in 
+                                True
+                in
+                    L13 
             in
-                L1 
+                letrec fun4_0 =                     lambda c_5 . 
+                    lambda b_5 . 
+                    lambda a_8 . 
+                    letrec L21 = 
+                        let _ = print 'a' in 
+                            let _ = print a_8 b_5 in 
+                                True
+                    in
+                        L21 
+                in
+                    letrec fun2_0 =                         lambda b_2 . 
+                        lambda a_4 . 
+                        letrec L11 = 
+                            let _ = print b_2 in 
+                                let _ = print a_4 b_2 in 
+                                    unit
+                        in
+                            L11 
+                    in
+                        letrec L1 = 
+                            let x_0 = 1 in 
+                                let a_0 = 1 in 
+                                    let a_1 = 2 in 
+                                        let c_0 = 2 in 
+                                            let _ = fun_0  in 
+                                                let _ = fun2_0 1 in 
+                                                    unit
+                        in
+                            L1 

@@ -855,18 +855,20 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa):
 
         f_name = try_get_used_name_of_function(cfg.name, parent_const_dict)
         if f_name is None:
-            f_name = get_global_unique_name_with_update(cfg.name, used_var_names) + '_0'
+            f_name = get_global_unique_name_with_update(cfg.name, used_var_names)
         #args_renamed = [get_global_unique_name_with_update(arg.arg, used_var_names) for arg in args]
         #prov_info.parent_vars[arg] for arg in args_renamed
         for arg in args:
             if arg.arg in prov_info.parent_vars:
                 del prov_info.parent_vars[arg.arg]
 
+        ssa_args = [SSA_V_VAR(get_global_unique_name_with_update(arg.arg, used_var_names), pos_info=Position(arg)) for arg in args]
+
         # Compute the phi nodes of the current function CFG
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars, function_vars=[arg.arg for arg in args])
 
         parsed_blocks = PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))
-        fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), [SSA_V_VAR(get_global_unique_name_with_update(arg.arg, used_var_names) + '_0', pos_info=Position(arg)) for arg in args], parsed_blocks, pos_info=Position(cfg.ast_node))
+        fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), ssa_args, parsed_blocks, pos_info=Position(cfg.ast_node))
 
         # Update the used variable names
         update_used_vars(ssa_results_stored, const_dict)
