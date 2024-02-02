@@ -629,34 +629,37 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
     if isinstance(term, SSA_E_IF_ELSE):
         unwrap_inner_applications_naming(term.test, True)
         return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else]), ssa_node=term), True)
-    if issubclass(type(term), SSA_V):
+    if isinstance(term, SSA_E_FUNC_CALL):
         unwrap_inner_applications_naming(term)
         return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:]), ssa_node=term))
     if issubclass(type(term), SSA_E_COMM):
         return ANF_E_COMM(term.text, SA_ES(b, terms[1:]), ssa_node=term)
+    if issubclass(type(term), SSA_V):
+        # Needed for variables just being there like in an transformed ifexp node
+        return ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:]))
     return ANF_E_APP([], ANF_V_CONST('Not-Impl'))
 
 
-def unwrap_inner_applications_let_structure(var: SSA_V, inner, unwrap_var: bool = False):
-    if isinstance(var, SSA_V_FUNC_CALL):
+def unwrap_inner_applications_let_structure(var: SSA_V | SSA_E_FUNC_CALL, inner, unwrap_var: bool = False):
+    if isinstance(var, SSA_E_FUNC_CALL):
         if unwrap_var:
             name = buffer_assignments[var]
             inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=var), SA_V(var), inner, ssa_node=var))
         else:
             for arg in var.args:
-                if isinstance(arg, SSA_V_FUNC_CALL):
+                if isinstance(arg, SSA_E_FUNC_CALL):
                     name = buffer_assignments[arg]
                     inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=arg), SA_V(arg), inner, ssa_node=arg))
     return inner
 
 
 def unwrap_inner_applications_naming(var: SSA_V, unwrap_var: bool = False):
-    if isinstance(var, SSA_V_FUNC_CALL):
+    if isinstance(var, SSA_E_FUNC_CALL):
         if unwrap_var:
             name = get_buffer_variable()
             buffer_assignments[var] = name
         for arg in var.args:
-            if isinstance(arg, SSA_V_FUNC_CALL):
+            if isinstance(arg, SSA_E_FUNC_CALL):
                 name = get_buffer_variable()
                 buffer_assignments[arg] = name
                 unwrap_inner_applications_naming(arg)
@@ -670,7 +673,7 @@ def SA_V(var: SSA_V, can_be_buffered: bool = False):
         return ANF_V_CONST(var.value, ssa_node=var)
     if isinstance(var, SSA_L):
         return ANF_V_CONST(var.label, ssa_node=var)
-    if isinstance(var, SSA_V_FUNC_CALL):
+    if isinstance(var, SSA_E_FUNC_CALL):
         if can_be_buffered and var in buffer_assignments:
             return ANF_V_VAR(buffer_assignments[var], ssa_node=var)
         else:
@@ -841,17 +844,17 @@ def post_processing_anf_to_python(code):
             if i + j < len(lines):
                 indentation = len(re.findall(r"^ *", lines[i + j])[0])
 
-                j2 = 2
-                while len(re.findall(r"^ *", lines[i + j + j2])[0]) > indentation and not re.match(r'^ *def ', lines[i + j + j2]):
-                    j2 += 1
-                    if i + j + j2 >= len(lines):
-                        break
+                j2 = 1
+                #while len(re.findall(r"^ *", lines[i + j + j2])[0]) > indentation and not re.match(r'^ *def ', lines[i + j + j2]):
+                #    j2 += 1
+                #    if i + j + j2 >= len(lines):
+                #        break
                 if i + j + j2 < len(lines):
                     target_indentation = indentation + 4
                     if fun_end_idx == 0:
-                        lines = lines[i + j:i+j+j2-1] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+j-1]] + lines[i+j+j2:]
+                        lines = lines[i + j:i+j+j2] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+j-1]] + lines[i+j+j2:]
                     else:
-                        lines = lines[i + fun_end_idx:i+j+j2-1] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+fun_end_idx-1]] + lines[i+j+j2:]
+                        lines = lines[i + fun_end_idx:i+j+j2] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+fun_end_idx-1]] + lines[i+j+j2:]
                     x = '\n'.join(lines)
                     y = '\n'.join(output.split('\n')[:-2])
                     return '\n'.join(output.split('\n')[:-2]) + post_processing_anf_to_python('\n'.join(lines))

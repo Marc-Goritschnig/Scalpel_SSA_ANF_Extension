@@ -222,7 +222,7 @@ class SSA_E(SSANode):
         return ""
 
 
-class SSA_V_FUNC_CALL(SSA_V):
+class SSA_E_FUNC_CALL(SSA_E):
     def __init__(self, name: SSA_L | SSA_V, args: [SSA_V], pos_info: Position = None):
         super().__init__(pos_info=pos_info)
         self.name: SSA_L | SSA_V = name
@@ -955,7 +955,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     old_iter_var.name = var_name + '_' + str(int(idx) - 1)
     old_iter_var2 = PS_E(prov_info, block, stmt.target, 0, False)
     old_iter_var2.name = old_iter_var2.name + '_2'
-    stmts.append(SSA_E_ASS(old_iter_var, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)])))
+    stmts.append(SSA_E_ASS(old_iter_var, SSA_E_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)])))
     stmts.append(SSA_E_GOTO(SSA_L(new_block_name)))
 
     stmts.insert(0, SSA_E_COMM('#-SSA-FOR'))
@@ -967,7 +967,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     next_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
     stmts2.append(SSA_E_ASS_PHI(next_iter_var, [old_iter_var, old_iter_var2]))
     buffer = get_buffer_var()
-    stmts2.append(SSA_E_ASS(SSA_V_VAR(buffer), SSA_V_FUNC_CALL(SSA_V_VAR('_' + ast.Is.__name__), [next_iter_var, SSA_V_VAR("None")])))
+    stmts2.append(SSA_E_ASS(SSA_V_VAR(buffer), SSA_E_FUNC_CALL(SSA_V_VAR('_' + ast.Is.__name__), [next_iter_var, SSA_V_VAR("None")])))
     if len(block.exits) == 1:
         else_ref = SSA_E_RET(None)
     else:
@@ -978,7 +978,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     # TODO Search through blocks within the block.exits[0] recursively for exits to "block" and replace them with the mock block
     ret_block = replace_and_find_returning_loop_block([], block, block, CFGBlockMock(new_block_name, block.exits))
     # block.exits[0].target.exits[len(block.exits[0].target.exits) - 1].target = CFGBlockMock(new_block_name, block.exits)
-    addon_statements_per_block[ret_block] = [SSA_E_ASS(old_iter_var2, SSA_V_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)]))]
+    addon_statements_per_block[ret_block] = [SSA_E_ASS(old_iter_var2, SSA_E_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)]))]
     b2 = SSA_B(SSA_L(new_block_name, pos_info=pos_info), stmts2, first_in_proc, pos_info=pos_info)
 
     return [b, b2]
@@ -1000,7 +1000,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
         if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple) or isinstance(stmt.targets[0], ast.List) or isinstance(stmt.targets[0], ast2.List):
             tuple_name = get_buffer_var()
-            post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_V_FUNC_CALL(SSA_V_VAR('tuple_get', pos_info=Position(stmt.value)), [SSA_V_VAR(tuple_name, pos_info=Position(stmt.value)), SSA_V_CONST(str(idx), pos_info=Position(stmt.value))]), pos_info=Position(stmt.value)) for idx, var in enumerate(stmt.targets[0].elts)]
+            post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_E_FUNC_CALL(SSA_V_VAR('tuple_get', pos_info=Position(stmt.value)), [SSA_V_VAR(tuple_name, pos_info=Position(stmt.value)), SSA_V_CONST(str(idx), pos_info=Position(stmt.value))]), pos_info=Position(stmt.value)) for idx, var in enumerate(stmt.targets[0].elts)]
             parts = original_code_lines[stmt.lineno - 1].split(' = ')
             parenthesis = '1' if '(' in parts[0] else '0'
             parenthesis += '1' if '(' in parts[1] else '0'
@@ -1025,7 +1025,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
     elif isinstance(stmt, ast.Return):
         return [SSA_E_RET(PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Delete):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Delete_' + str(len(stmt.targets)), pos_info=Position(stmt)), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.targets], pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Delete_' + str(len(stmt.targets)), pos_info=Position(stmt)), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.targets], pos_info=Position(stmt))]
     elif isinstance(stmt, ast.For):
         # Handled separately
         return []
@@ -1036,26 +1036,26 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         return [SSA_E_ASS(variable, PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Raise):
         if stmt.cause is not None:
-            return [SSA_V_FUNC_CALL(SSA_V_VAR('_Raise_2', pos_info=Position(stmt)), [SSA_V_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])] +
+            return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise_2', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])] +
                                     [PS_E(prov_info, curr_block, stmt.cause, st_nr, False)], pos_info=Position(stmt))]
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Raise_1', pos_info=Position(stmt)), [SSA_V_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])], pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise_1', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])], pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Assert):
         args = [PS_E(prov_info, curr_block, stmt.test, st_nr, False)]
         name = '_Assert'
         if stmt.msg is not None:
             name = '_Assert_2'
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
-        return [SSA_V_FUNC_CALL(SSA_V_VAR(name, pos_info=Position(stmt)), args, pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR(name, pos_info=Position(stmt)), args, pos_info=Position(stmt))]
     elif stmt.__class__.__name__ == ast.Comment.__name__:
         if stmt.value == '#-SSA-Placeholder':
             return []
         return [SSA_E_COMM(stmt.value, pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Pass):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Pass', pos_info=Position(stmt)), [], pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Pass', pos_info=Position(stmt)), [], pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Break):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Break', pos_info=Position(stmt)), [], pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Break', pos_info=Position(stmt)), [], pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Continue):
-        return [SSA_V_FUNC_CALL(SSA_V_VAR('_Continue', pos_info=Position(stmt)), [], pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Continue', pos_info=Position(stmt)), [], pos_info=Position(stmt))]
 
     if debug_mode:
         print("Nothing matched for statement: ", stmt)
@@ -1066,14 +1066,14 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
 def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
     if isinstance(stmt, ast.BinOp):
         pos = Position(stmt)
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)], pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), PS_E(prov_info, curr_block, stmt.right, st_nr, is_load)], pos_info=pos)
     elif isinstance(stmt, ast.BoolOp):
         pos = Position(stmt.values[0:2])
-        result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values[:2]], pos_info=pos)
+        result = SSA_E_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.values[:2]], pos_info=pos)
         values = stmt.values[2:]
         while len(values) > 0:
             pos = Position([result, values[0]])
-            result = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)], pos_info=pos)
+            result = SSA_E_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [result, PS_E(prov_info, curr_block, values[0], st_nr, is_load)], pos_info=pos)
             values = values[1:]
         return result
     elif isinstance(stmt, ast.NamedExpr):
@@ -1083,13 +1083,13 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         return buffer_assignments[stmt]
     elif isinstance(stmt, ast.UnaryOp):
         pos = Position(stmt)
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)], pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)], pos_info=pos)
     elif isinstance(stmt, ast.Call):
         if isinstance(stmt.func, ast.Attribute):
             pos = Position(stmt)
-            return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.func.attr, pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in ([stmt.func.value] + stmt.args)], pos_info=pos)
+            return SSA_E_FUNC_CALL(SSA_V_VAR(stmt.func.attr, pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in ([stmt.func.value] + stmt.args)], pos_info=pos)
         else:
-            return SSA_V_FUNC_CALL(PS_E(prov_info, curr_block, stmt.func, st_nr, is_load), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args], pos_info=Position(stmt))
+            return SSA_E_FUNC_CALL(PS_E(prov_info, curr_block, stmt.func, st_nr, is_load), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args], pos_info=Position(stmt))
     elif isinstance(stmt, ast.Compare):
         return PS_MAP2(prov_info, curr_block, PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), stmt.ops, stmt.comparators, st_nr)
     elif isinstance(stmt, ast.Constant):
@@ -1101,16 +1101,16 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         return SSA_V_CONST(stmt.value, pos_info=Position(stmt))
     elif isinstance(stmt, ast.Tuple) or isinstance(stmt, ast2.Tuple):
         pos = Position(stmt)
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_tuple_' + str(len(stmt.elts)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts], pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR('_new_tuple_' + str(len(stmt.elts)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts], pos_info=pos)
     elif stmt.__class__.__name__ == 'Dict':
         pos = Position(stmt)
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_dict_' + str(len(stmt.keys)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for args in zip(stmt.keys, stmt.values) for arg in args], pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR('_new_dict_' + str(len(stmt.keys)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for args in zip(stmt.keys, stmt.values) for arg in args], pos_info=pos)
     elif isinstance(stmt, ast.Set):
         pos = Position(stmt)
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_set_' + str(len(stmt.elts)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts], pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR('_new_set_' + str(len(stmt.elts)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts], pos_info=pos)
     elif isinstance(stmt, ast.List) or isinstance(stmt, ast2.List): # somehow ast_comments generates ast.List nodes instead of ast_comments.List
         pos = Position(stmt)
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_new_list_' + str(len(stmt.elts)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts], pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR('_new_list_' + str(len(stmt.elts)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts], pos_info=pos)
     elif isinstance(stmt, ast.Subscript):
         if isinstance(stmt.slice, ast.Slice):
             appendix = ""
@@ -1123,13 +1123,13 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             if len(appendix) > 0:
                 appendix = "_" + appendix
             pos = Position(stmt)
-            return SSA_V_FUNC_CALL(SSA_V_VAR('_List_Slice' + appendix, pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]), pos_info=pos)
+            return SSA_E_FUNC_CALL(SSA_V_VAR('_List_Slice' + appendix, pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]), pos_info=pos)
         else:
             pos = Position(stmt)
-            return SSA_V_FUNC_CALL(SSA_V_VAR('_LSD_Get', pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + [PS_E(prov_info, curr_block, stmt.slice, st_nr, is_load)], pos_info=pos)
+            return SSA_E_FUNC_CALL(SSA_V_VAR('_LSD_Get', pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + [PS_E(prov_info, curr_block, stmt.slice, st_nr, is_load)], pos_info=pos)
     elif isinstance(stmt, ast.Attribute):
         pos = Position(stmt)
-        return SSA_V_FUNC_CALL(SSA_V_VAR(stmt.attr, pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)], pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR(stmt.attr, pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)], pos_info=pos)
     elif isinstance(stmt, ast.Name):
         name = get_global_unique_name(stmt.id, prov_info.parent_vars, used_var_names)
         if is_load:
@@ -1152,14 +1152,14 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
             elif isinstance(part, ast.FormattedValue):
                 pos = Position(stmt)
                 if hasattr(part, 'format_spec') and part.format_spec is not None:
-                    parts.append(SSA_V_FUNC_CALL(SSA_L('_str_format3', pos_info=pos), [PS_E(prov_info, curr_block, part.value, st_nr, is_load), SSA_V_CONST(part.conversion), PS_E(prov_info, curr_block, part.format_spec, st_nr, is_load)], pos_info=pos))
+                    parts.append(SSA_E_FUNC_CALL(SSA_L('_str_format3', pos_info=pos), [PS_E(prov_info, curr_block, part.value, st_nr, is_load), SSA_V_CONST(part.conversion), PS_E(prov_info, curr_block, part.format_spec, st_nr, is_load)], pos_info=pos))
                 else:
-                    parts.append(SSA_V_FUNC_CALL(SSA_L('_str_format2', pos_info=pos), [PS_E(prov_info, curr_block, part.value, st_nr, is_load), SSA_V_CONST(part.conversion)], pos_info=pos))
+                    parts.append(SSA_E_FUNC_CALL(SSA_L('_str_format2', pos_info=pos), [PS_E(prov_info, curr_block, part.value, st_nr, is_load), SSA_V_CONST(part.conversion)], pos_info=pos))
         #parts.reverse()
         out = parts[0]
         for part in parts[1:]:
             pos = Position(stmt)
-            out = SSA_V_FUNC_CALL(SSA_V_VAR('_Add', pos_info=pos), [out, part], pos_info=pos)
+            out = SSA_E_FUNC_CALL(SSA_V_VAR('_Add', pos_info=pos), [out, part], pos_info=pos)
         return out
 
     if debug_mode:
@@ -1171,8 +1171,8 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
 def PS_MAP2(prov_info, curr_block, left, ops, comparators, st_nr):
     pos = Position([left, comparators[0]])
     if len(ops) == 1:
-        return SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__, pos_info=pos), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)), pos_info=pos)
-    new_left = SSA_V_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__, pos_info=pos), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)), pos_info=pos)
+        return SSA_E_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__, pos_info=pos), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)), pos_info=pos)
+    new_left = SSA_E_FUNC_CALL(SSA_V_VAR('_' + type(ops[0]).__name__, pos_info=pos), (left, PS_E(prov_info, curr_block, comparators[0], st_nr, True)), pos_info=pos)
     return PS_MAP2(new_left, ops[1:], comparators[1:], st_nr)
 
 
