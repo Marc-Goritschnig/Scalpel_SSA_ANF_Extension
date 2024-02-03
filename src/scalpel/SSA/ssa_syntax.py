@@ -1039,13 +1039,13 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         if stmt.cause is not None:
             return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise_2', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])] +
                                     [PS_E(prov_info, curr_block, stmt.cause, st_nr, False)], pos_info=Position(stmt))]
-        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise_1', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])], pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])], pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Assert):
         args = [PS_E(prov_info, curr_block, stmt.test, st_nr, False)]
         name = '_Assert'
         if stmt.msg is not None:
             name = '_Assert_2'
-            args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
+            args.append(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
         return [SSA_E_FUNC_CALL(SSA_V_VAR(name, pos_info=Position(stmt)), args, pos_info=Position(stmt))]
     elif stmt.__class__.__name__ == ast.Comment.__name__:
         if stmt.value == ORIGINAL_COMMENT_MARKER + ' SSA-Placeholder':
