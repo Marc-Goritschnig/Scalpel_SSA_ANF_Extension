@@ -1,0 +1,7 @@
+
+ORIGINAL_COMMENT_MARKER = '#'
+NEW_COMMENT_MARKER = '--'
+buffer_var_name = '%_'
+PROV_INFO_MARKER = '#'
+PROV_INFO_EXT_CHAR = ';'
+PROV_INFO_SPLIT_CHAR = '|'

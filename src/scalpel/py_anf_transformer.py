@@ -4,6 +4,7 @@ import re
 import argparse
 
 import scalpel.ast_comments as ast
+from scalpel.config import NEW_COMMENT_MARKER
 
 from scalpel.functions import trim_double_spaces
 
@@ -34,6 +35,10 @@ output_syntax = 0
 no_output_files = False
 no_pos = False
 print_prov_info = False
+
+
+
+
 
 def transform():
     # Print cfg into file
@@ -68,7 +73,7 @@ def transform():
 
         if debug_mode:
             print("Transformed SSA tree printed:")
-            print(trim_double_spaces(ssa_ast.print(0)))
+            print(trim_double_spaces(ssa_ast.print(0), NEW_COMMENT_MARKER))
             print('\n\n\n')
 
         # Create an ANF AST from SSA AST
@@ -86,7 +91,7 @@ def transform():
             if print_prov_info:
                 print(anf_w_prov)
             else:
-                print(trim_double_spaces(anf_ast.print(0)))
+                print(trim_double_spaces(anf_ast.print(0), NEW_COMMENT_MARKER))
 
         if debug_mode:
             print('\n\n\n')
@@ -116,7 +121,7 @@ def transform():
 
                 if debug_mode:
                     print('Parsed anf tree printed:')
-                    print(trim_double_spaces(parsed.print(0)))
+                    print(trim_double_spaces(parsed.print(0), NEW_COMMENT_MARKER))
                     print('\n\n\n')
 
         # Parsing the anf code back to Python

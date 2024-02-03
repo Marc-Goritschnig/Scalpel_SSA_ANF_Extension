@@ -7,6 +7,7 @@ from scalpel import ast_comments as ast
 from scalpel.core.mnode import MNode
 from scalpel.SSA.const import SSA
 from scalpel.functions import get_global_unique_name, get_global_unique_name_with_update
+from scalpel.config import ORIGINAL_COMMENT_MARKER, NEW_COMMENT_MARKER
 
 debug_mode = True
 font = {'assign': '←',
@@ -541,10 +542,10 @@ def preprocess_py_code(code):
                 indentation = len(re.findall(r"^ *", line)[0])
 
                 for i in range(node.lineno - 1, node.end_lineno):
-                    lines[i] = '# ' + lines[i]
+                    lines[i] = ORIGINAL_COMMENT_MARKER + ' ' + lines[i]
 
-                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-ClassStart')
-                lines.insert(node.end_lineno + 1, indentation * ' ' + '#-SSA-ClassEnd')
+                lines.insert(node.lineno - 1, indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-ClassStart')
+                lines.insert(node.end_lineno + 1, indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-ClassEnd')
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -552,8 +553,8 @@ def preprocess_py_code(code):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
                 indentation = len(re.findall(r"^ *", line)[0])
-                lines[node.lineno - 1] = '# ' + lines[node.lineno - 1]
-                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-Import')
+                lines[node.lineno - 1] = ORIGINAL_COMMENT_MARKER + ' ' + lines[node.lineno - 1]
+                lines.insert(node.lineno - 1, indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-Import')
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -569,7 +570,7 @@ def preprocess_py_code(code):
                 indentation += 4
                 # For a lambda the comment is placed after the first responsible code line
                 # because a function will be parsed into a proc and no code is written in front of the proc
-                new_lines.append(indentation * ' ' + '#-SSA-Lambda')
+                new_lines.append(indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-Lambda')
                 new_lines += [(' ' * indentation + body_l) for body_l in ('return ' + ast.unparse(node.body)).split('\n')]
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
@@ -588,7 +589,7 @@ def preprocess_py_code(code):
                     lines[node.lineno - 1] = line[:node.col_offset] + ' ' + node.target.id + ' ' + line[node.end_col_offset:]
                     new_lines = []
                     indentation = len(re.findall(r"^ *", line)[0])
-                    new_lines.append(indentation * ' ' + '#-SSA-NamedExpr')
+                    new_lines.append(indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-NamedExpr')
                     new_lines.append(indentation * ' ' + node.target.id + ' = ' + ast.unparse(node.value))
                     lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
                     code = '\n'.join(lines)
@@ -601,7 +602,7 @@ def preprocess_py_code(code):
                     if items := getattr(last_node, attr, None):
                         if not isinstance(items, Iterable):
                             continue
-                        node.body.append(ast.parse('#-SSA-Placeholder').body[0])
+                        node.body.append(ast.parse(ORIGINAL_COMMENT_MARKER + ' SSA-Placeholder').body[0])
                         replaced = True
                         code = ast.unparse(tree)
                         break
@@ -622,7 +623,7 @@ def preprocess_py_code(code):
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '[' +ast.unparse(node.key) + '] = ' + ast.unparse(node.value))
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
-                lines.insert(node.lineno - 1, starting_indentation * ' ' + '#-SSA-DictComp')
+                lines.insert(node.lineno - 1, starting_indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-DictComp')
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -641,7 +642,7 @@ def preprocess_py_code(code):
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '.append(' + ast.unparse(node.elt) + ')')
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
-                lines.insert(node.lineno - 1, original_indentation * ' ' + '#-SSA-ListComp')
+                lines.insert(node.lineno - 1, original_indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-ListComp')
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -659,7 +660,7 @@ def preprocess_py_code(code):
                     indentation += 4
                 new_lines.append(indentation * ' ' + buffer_var + '.add(' + ast.unparse(node.elt) + ')')
                 lines = lines[:node.lineno - 1] + new_lines + lines[node.lineno - 1:]
-                lines.insert(node.lineno - 1, indentation * ' ' + '#-SSA-SetComp')
+                lines.insert(node.lineno - 1, indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-SetComp')
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -679,7 +680,7 @@ def preprocess_py_code(code):
 
                 new_code = ast.unparse(node.target) + ' = ' + ast.unparse(node.target) + ' ' + operator_map[type(node.op)] + ' (' + ast.unparse(node.value) + ')'
                 lines[node.lineno - 1] = line[:node.col_offset] + new_code + line[node.end_col_offset:]
-                lines = lines[:node.lineno - 1] + [(indentation * ' ') + '#-SSA-AugAssign'] + lines[node.lineno - 1:]
+                lines = lines[:node.lineno - 1] + [(indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-AugAssign'] + lines[node.lineno - 1:]
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -690,7 +691,7 @@ def preprocess_py_code(code):
                 lines[node.lineno - 1] = line[:node.col_offset] + buffer_var + line[node.end_col_offset:]
 
                 indentation = len(re.findall(r"^ *", line)[0])
-                new_code = (indentation * ' ' + '#-SSA-IfExp\n'
+                new_code = (indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-IfExp\n'
                             + indentation * ' ' + 'if ' + ast.unparse(node.test) + ':\n' \
                             + indentation * ' ' + get_tab() + buffer_var + ' = ' + ast.unparse(node.body) + '\n' \
                             + indentation * ' ' + 'else:\n' \
@@ -708,7 +709,7 @@ def preprocess_py_code(code):
                 lines[node.lineno - 1] = line[:node.col_offset] + ast.unparse(node.target) + value_str + line[node.end_col_offset:]
 
                 indentation = len(re.findall(r"^ *", line)[0])
-                new_code = (indentation * ' ') + '#-SSA-AnnAssign|' + node.annotation.id + '|' + str(node.simple)
+                new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-AnnAssign|' + node.annotation.id + '|' + str(node.simple)
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True
@@ -724,7 +725,7 @@ def preprocess_py_code(code):
 
                 lines[node.lineno - 1] = (indentation * ' ') + var + ' = ' + 'dict_set(' + var + ',' + ast.unparse(slice) + ',' + ast.unparse(value) + ')'
 
-                new_code = (indentation * ' ') + '#-SSA-SubscriptSet'
+                new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptSet'
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True
@@ -754,7 +755,7 @@ def preprocess_py_code(code):
                 #    lines[node.lineno - 1] = ''
                 #    buffer_var = '_'
 
-                new_code = (indentation * ' ') + '#-SSA-Attribute\n' + (indentation * ' ') + buffer_var + ' = ' + fun_name + attr + '(' + var + params + ')'
+                new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-Attribute\n' + (indentation * ' ') + buffer_var + ' = ' + fun_name + attr + '(' + var + params + ')'
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True
@@ -869,7 +870,7 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa, parent_fun_name=None):
 
         parsed_blocks = PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))
         if parent_fun_name is not None:
-            parsed_blocks[0].terms = [SSA_E_COMM('#-SSA-WithinFun-' + parent_fun_name)] + parsed_blocks[0].terms
+            parsed_blocks[0].terms = [SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-WithinFun-' + parent_fun_name)] + parsed_blocks[0].terms
         fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), ssa_args, parsed_blocks, pos_info=Position(cfg.ast_node))
 
         # Update the used variable names
@@ -958,7 +959,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     stmts.append(SSA_E_ASS(old_iter_var, SSA_E_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)])))
     stmts.append(SSA_E_GOTO(SSA_L(new_block_name)))
 
-    stmts.insert(0, SSA_E_COMM('#-SSA-FOR'))
+    stmts.insert(0, SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-FOR'))
     pos_info = Position(stmts)
     block_ref.pos_info = pos_info
     b = SSA_B(block_ref, stmts, first_in_proc, pos_info=pos_info)
@@ -1004,7 +1005,7 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
             parts = original_code_lines[stmt.lineno - 1].split(' = ')
             parenthesis = '1' if '(' in parts[0] else '0'
             parenthesis += '1' if '(' in parts[1] else '0'
-            return [SSA_E_COMM('#-SSA-Tuple' + parenthesis)] + [SSA_E_ASS(SSA_V_VAR(tuple_name, pos_info=Position(stmt.targets[0])), PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position(stmt))] + post_stmts
+            return [SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-Tuple' + parenthesis)] + [SSA_E_ASS(SSA_V_VAR(tuple_name, pos_info=Position(stmt.targets[0])), PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position(stmt))] + post_stmts
         return [SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position([stmt.targets[0], stmt.value]))]
     elif isinstance(stmt, ast.If):
         if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
@@ -1047,9 +1048,9 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
             args.add(PS_E(prov_info, curr_block, stmt.msg, st_nr, False))
         return [SSA_E_FUNC_CALL(SSA_V_VAR(name, pos_info=Position(stmt)), args, pos_info=Position(stmt))]
     elif stmt.__class__.__name__ == ast.Comment.__name__:
-        if stmt.value == '#-SSA-Placeholder':
+        if stmt.value == ORIGINAL_COMMENT_MARKER + ' SSA-Placeholder':
             return []
-        return [SSA_E_COMM(stmt.value, pos_info=Position(stmt))]
+        return [SSA_E_COMM(stmt.value.replace(ORIGINAL_COMMENT_MARKER, NEW_COMMENT_MARKER, 1), pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Pass):
         return [SSA_E_FUNC_CALL(SSA_V_VAR('_Pass', pos_info=Position(stmt)), [], pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Break):

@@ -3,20 +3,15 @@ from __future__ import annotations
 import ast
 
 from scalpel.SSA.ssa_syntax import *
-# from scalpel.SSA.ssa_syntax import buffer_var_name
 
 import re
 
 from scalpel.functions import trim_double_spaces
+from scalpel.config import PROV_INFO_EXT_CHAR, PROV_INFO_SPLIT_CHAR, PROV_INFO_MARKER
 
 font = {'lambda_sign': 'λ'}
 debug_mode = False
 no_pos_tracking = False
-comment_separator = '--'
-COMMENT_MARKER = '#'
-buffer_var_name = '%_'
-PROV_INFO_EXT_CHAR = ';'
-PROV_INFO_SPLIT_CHAR = '|'
 
 # Prefix of block labels from SSA
 block_identifier = 'L'
@@ -223,6 +218,10 @@ class ANF_E_COMM(ANF_E):
         self.term: ANF_E = term
 
     def print(self, lvl = 0, prov_info: str = ''):
+        #print('comm')
+        #print(self.text)
+        #print(get_indentation(lvl) + f"{self.text}\n{self.term.print(lvl)}")
+
         return get_indentation(lvl) + f"{self.text}\n{self.term.print(lvl)}"
 
     def get_prov_info(self, prov_info):
@@ -230,12 +229,13 @@ class ANF_E_COMM(ANF_E):
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         out = self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        #if self.text.startswith('#-SSA-'):
+        #if self.text.startswith('# SSA-'):
         #    out = out.split('\n')
         #    out = [out[0] + self.text] + out[1:]
         #    out = '\n'.join(out)
         #else:
         out = get_indentation(lvl) + self.text + '\n' + out
+        out = out.replace(NEW_COMMENT_MARKER, ORIGINAL_COMMENT_MARKER, 1)
         return post_processing_anf_to_python(out)
 
 
@@ -691,25 +691,25 @@ def get_buffer_variable():
 
 # Print the ANF tree including the provenance information right aligned to the code per line
 def print_anf_with_prov_info(anf_parent: ANFNode):
-    out = trim_double_spaces(anf_parent.print())
+    out = trim_double_spaces(anf_parent.print(), NEW_COMMENT_MARKER)
     prov = anf_parent.get_prov_info(None)
     max_chars = max([len(line) + line.count('\t') * 3 for line in out.split('\n')]) + 2
-    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + comment_separator + info for line, info in zip(out.split('\n'), prov.split('\n'))])
+    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + PROV_INFO_MARKER + info for line, info in zip(out.split('\n'), prov.split('\n'))])
 
 
 # Read anf code and parse it into internal ANF AST representation
 def parse_anf_from_text(code: str):
     code = code.strip()
     lines = code.split('\n')
-    code_lines, info_lines = zip(*[tuple(line.split(comment_separator)) for line in lines])
-    code_lines = [line if re.match(r'^(\s)*' + COMMENT_MARKER, line) else re.sub(' +', ' ', line) for line in code_lines]
+    code_lines, info_lines = zip(*[tuple(line.split(PROV_INFO_MARKER)) for line in lines])
+    code_lines = [line if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else re.sub(' +', ' ', line) for line in code_lines]
     code_words = []
 
     for line in code_lines:
-        for i, part in enumerate([line.strip()] if re.match(r'^(\s)*' + COMMENT_MARKER, line) else line.strip().split('\'')):
+        for i, part in enumerate([line.strip()] if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else line.strip().split('\'')):
             if part != ' ':
                 for j, word in enumerate(
-                        [part] if re.match(r'^(\s)*' + COMMENT_MARKER, part) else part.strip().split(' ')):
+                        [part] if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, part) else part.strip().split(' ')):
                     if i % 2 == 0:
                         code_words.append(word)
                     elif j == 0:
@@ -726,7 +726,7 @@ def parse_anf_e_from_code(code_words, info_words):
         info1_parts = info_words[1].split(PROV_INFO_EXT_CHAR)
 
     # Found a comment within provenance information
-    if len(code_words[0]) > 0 and code_words[0][0] == '#':
+    if len(code_words[0]) > 0 and code_words[0].startswith(NEW_COMMENT_MARKER):
         return ANF_E_COMM(code_words[0], parse_anf_e_from_code(code_words[1:], info_words[1:]))
     if next_word == 'let':
         variable = ANF_V_VAR(code_words[1], info1_parts[0] == 'bv')
@@ -826,11 +826,11 @@ def post_processing_anf_to_python(code):
 
         line = lines[i]
         line_strip = line.strip()
-        if '#-SSA-AugAssign' in line:
+        if ORIGINAL_COMMENT_MARKER + ' SSA-AugAssign' in line:
             output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
             skip = 1
-        elif line_strip.startswith('#-SSA-WithinFun-'):
-            fun_name = lines[i].replace('#-SSA-WithinFun-', '').strip()
+        elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-WithinFun-'):
+            fun_name = lines[i].replace(ORIGINAL_COMMENT_MARKER + ' SSA-WithinFun-', '').strip()
             fun_end_idx = 0
             j = 2
             while not re.match(r'^ *def ' + fun_name + '.*', lines[i + j]):
@@ -862,13 +862,13 @@ def post_processing_anf_to_python(code):
                     output += line + '\n'
             else:
                 output += line + '\n'
-        elif '#-SSA-ClassStart' in line:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-ClassStart' in line:
             j = 1
-            while not lines[i + j].startswith('#-SSA-ClassEnd'):
+            while not lines[i + j].startswith(ORIGINAL_COMMENT_MARKER + ' SSA-ClassEnd'):
                 lines[i + j] = lines[i + j][2:]
                 j += 1
             lines[i + j] = ''
-        elif '#-SSA-Import' in line:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-Import' in line:
             lines[i + 1] = lines[i + 1][2:]
             lines[i] = ''
         elif '_str_format' in line_strip:
@@ -902,12 +902,12 @@ def post_processing_anf_to_python(code):
 
             lines[i] = out
             return output + post_processing_anf_to_python('\n'.join(lines[i:]))
-        elif '#-SSA-NamedExpr' in line:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-NamedExpr' in line:
             var, val = re.sub(r'^ *(.*) = (.*)', r'\1;\2', lines[i + 1]).split(';')
             start, var_part, end = re.sub(r'(.*)(([^a-zA-z]|^)' + var + '([^a-zA-z]|$))(.*)', r'\1;\2;\5', lines[i + 2]).split(';')
             lines[i + 2] = start + var_part.replace(var, '(' + var + ' := ' + val + ')') + end
             skip = 1
-        elif '#-SSA-Tuple' in line:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-Tuple' in line:
             indentation = len(re.findall(r"^ *", lines[i + 1])[0])
             var, value = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2', lines[i + 1]).split(';')
             j = 2
@@ -915,12 +915,12 @@ def post_processing_anf_to_python(code):
             while (var + '[') in lines[i + j]:
                 vars.append(lines[i + j].split(' = ')[0].strip())
                 j += 1
-            parenthesis = line_strip.split('#-SSA-Tuple')[1]
+            parenthesis = line_strip.split(ORIGINAL_COMMENT_MARKER + ' SSA-Tuple')[1]
             part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
             part2 = '(' + value + ')' if parenthesis[1] == '1' else value
             output += indentation * ' ' + part1 + ' = ' + part2 + '\n'
             skip = len(vars) + 1
-        elif '#-SSA-ListComp' in line or '#-SSA-SetComp' in line or '#-SSA-DictComp' in line:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-ListComp' in line or ORIGINAL_COMMENT_MARKER + ' SSA-SetComp' in line or ORIGINAL_COMMENT_MARKER + ' SSA-DictComp' in line:
             variable = lines[i + 1].split('=')[0].strip()
             j = 2
             out = ''
@@ -929,21 +929,21 @@ def post_processing_anf_to_python(code):
                 out = out + lines[i + j].split(':')[0].strip() + ' '
                 j += 1
 
-            if '#-SSA-DictComp' in line:
+            if ORIGINAL_COMMENT_MARKER + ' SSA-DictComp' in line:
                 value = re.sub(r'^ *.*\[(.*)\] = (.*)', r'\1;\2', lines[i + j]).strip().split(';')
                 value = value[0] + ': ' + value[1]
             else:
                 value = re.sub(r'^ *' + variable + '\\.' + VAR_NAME_REGEX + '\((.*)\).*', r'\1', lines[i + j]).strip()
 
             out = value + ' ' + out
-            if '#-SSA-ListComp' in line:
+            if ORIGINAL_COMMENT_MARKER + ' SSA-ListComp' in line:
                 out = '[' + out + ']' + '\n'
             else:
                 out = '{' + out + '}' + '\n'
 
             output += lines[i + j + 1].replace(variable, out)
             skip = j + 1
-        elif '#-SSA-Lambda' in line and 'def ' in lines[i - 1]:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-Lambda' in line and 'def ' in lines[i - 1]:
             name, args = re.sub(r'def (.*)\((.*)\).*', r'\1;\2', lines[i - 1]).split(';')
             code = lines[i + 1]
             output = ''.join(output.split('\n')[:-2])
@@ -955,11 +955,11 @@ def post_processing_anf_to_python(code):
                 lines[i + j] = re.sub(name + '([^\w_0-9]+|$)+', 'lambda ' + args + ': ' + code, lines[i + j])
                 j += 1
             skip = 1
-        elif line_strip.startswith('#-SSA-SubscriptSet'):
+        elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptSet'):
             indentation, var, subscript, value = re.sub(r'^( *)(.*) = .*\((.*),(.*),(.*)\).*', r'\1;\2;\4;\5', lines[i + 1]).split(';')
             output += indentation + var + '[' + subscript + '] = ' + value + '\n'
             skip = 1
-        elif line_strip.startswith('#-SSA-AnnAssign'):
+        elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-AnnAssign'):
             indentation = len(re.findall(r"^ *", lines[i + 1])[0])
             _, t, simple = line_strip.split('|')
             p1, p2 = lines[i + 1].strip().split(' = ')
@@ -968,7 +968,7 @@ def post_processing_anf_to_python(code):
                 new_line = (indentation * ' ') + '(' + p1 + '): ' + t + ' = ' + p2 + '\n'
             output += new_line
             skip = 1
-        elif '#-SSA-FOR' in line and len(lines) > i + 5:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-FOR' in line and len(lines) > i + 5:
             indentation = len(re.findall(r"^ *", lines[i + 1])[0])
             _, arr = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2', lines[i + 1]).split(';')
             variable, _ = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2', lines[i + 2]).split(';')
@@ -986,7 +986,7 @@ def post_processing_anf_to_python(code):
 
             lines = [indentation * ' ' + 'for ' + variable + ' in ' + arr + ':\n'] + loop_body + code_after
             return output + post_processing_anf_to_python('\n'.join(lines))
-        elif '#-SSA-IfExp' in line:
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-IfExp' in line:
             indentation = len(re.findall(r"^ *", lines[i + 2])[0])
             if_term = re.sub(r'^(.*)if (.*):(.)*', r'\2',lines[i + 1])
             ssa_var, if_val = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2',lines[i + 2]).split(';')
@@ -1009,7 +1009,7 @@ def post_processing_anf_to_python(code):
 
             lines = [line] + else_block + code_after
             return output + post_processing_anf_to_python('\n'.join(lines))
-        elif line_strip.startswith('#-SSA-Attribute'):
+        elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-Attribute'):
             indentation, buffer, type, attr, var = re.sub(r'^( *)(.*) = _obj(2|)_(' + VAR_NAME_REGEX + ')\((.*)\)$', r'\1;\2;\3;\4;\5', lines[i + 1]).split(';')
             params = ''
             if ',' in var:

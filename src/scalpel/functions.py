@@ -1,11 +1,11 @@
 import re
 
-def trim_double_spaces(text):
+def trim_double_spaces(text, comm_char):
     lines = text.split('\n')
     trimmed_lines = []
 
     for line in lines:
-        if re.match(r'^\s*#', line):
+        if re.match(r'^\s*' + comm_char, line):
             trimmed_lines.append(line)
             continue
         leading_spaces = re.match(r'^\s*', line).group()
