@@ -136,7 +136,7 @@ def transform():
             # print('\n\n\n')
             # print('\n\n\n')
 
-        # print(anf_to_python)
+        print(anf_to_python)
         x = ast.parse(anf_to_python)
         print(add_missing_blank_lines(add_missing_blank_lines(ast.unparse(x))))
 

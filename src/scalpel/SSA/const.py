@@ -316,6 +316,7 @@ class SSA:
                     for bb in block_renamed_phi_stored[block.id]:
                         if phi_var in bb.keys():
                             idx = i
+                        i += 1
                     del block_renamed_phi_stored[block.id][idx]
         return block_renamed_stored, block_renamed_loaded, block_renamed_phi_stored, block_renamed_phi_loaded, ident_const_dict
 
