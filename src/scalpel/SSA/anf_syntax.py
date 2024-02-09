@@ -70,6 +70,7 @@ function_mapping = {
     '_List_Slice_LS': '%s[%s::%s]',
     '_List_Slice_LU': '%s[%s:%s]',
     '_List_Slice_LUS': '%s[%s:%s:%s]',
+    '_List_Slice_S': '%s[::%s]',
     'tuple_get': '%s[%s]'
 }
 
