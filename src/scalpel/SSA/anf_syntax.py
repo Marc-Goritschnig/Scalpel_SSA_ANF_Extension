@@ -291,7 +291,11 @@ class ANF_E_LETREC(ANF_E):
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if re.match(block_label_regex, self.var.name):
-            assignments[self.var.name] = self.term1.term if isinstance(self.term1, ANF_E_FUNC) else self.term1
+            t1 = self.term1
+            # If function - get term of it (can be nested function when multiple input parameters)
+            while isinstance(t1, ANF_E_FUNC):
+                t1 = t1.term
+            assignments[self.var.name] = t1
             out = self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
             return post_processing_anf_to_python(out)
 
