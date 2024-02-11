@@ -297,18 +297,6 @@ class ANF_E_LETREC(ANF_E):
             out = self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
             return post_processing_anf_to_python(out)
 
-        if isinstance(self.var, ANF_V_VAR):
-            if self.var.name.startswith(block_identifier) and isinstance(self.term2, ANF_E_APP):
-                if self.term2.name.name == self.var.name:
-                    # L1 = XXX in L1
-                    # Return just XXX and store XXX if still L1 is called somewhere else
-                    assignments[self.var.name] = self.term2
-                    out = self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl, False)
-                    return post_processing_anf_to_python(out)
-        elif isinstance(self.term2, ANF_E_FUNC):
-            out = get_indentation(lvl) + 'def ' + self.var.print(0, None) + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + '\n' + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-            return post_processing_anf_to_python(out)
-
         vars = get_function_parameter_recursive(self.term1)
         next_term = get_next_non_function_term(self.term1)
         newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
