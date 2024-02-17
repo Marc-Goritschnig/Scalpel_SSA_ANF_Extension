@@ -204,8 +204,6 @@ class ANF_E_APP(ANF_E):
                         out = value([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params])
                     else:
                         out = (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
-            if re.match('L([0-9]|_)*', self.name.name):
-                out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)
         if out is None:
             # Default output if nothing applies
             out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]) + ')'
@@ -260,7 +258,6 @@ class ANF_E_LET(ANF_E):
             lines = self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names).split('\n')
             lines = [get_indentation(lvl) + s for s in lines]
             return '\n'.join(lines) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        #elif self.var.is_buffer_var:
         elif self.var.is_buffer_var:
             assignments[name] = self.term1
             return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
@@ -485,15 +482,10 @@ class ANF_E_FUNC(ANF_E):
             return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
         return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.input_var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
 
-    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0, print_variables=True):
-        if not print_variables:
-            return self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        vars = get_function_parameter_recursive(self.term)
-        next_term = get_next_non_function_term(self.term)
-        if self.input_var is None:
-            return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        vars += [self.input_var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names)]
-        return '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
+        # Not used_var_names
+        # letrecs of parsed functions do not call print on this type only read its variables and innermost term
+        return None
 
 
 def get_first_node_diff_than_comment(node):
@@ -528,7 +520,7 @@ def SA(ssa_ast: SSA_AST):
 
     # Transform all procedures of the SSA AST and put the call of the first block as inner most term
     first_block = get_first_block_in_proc(ssa_ast.blocks)
-    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + str(first_block.label.label)), ssa_node=first_block)))
+    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + str(first_block.label.label)), ssa_node=first_block)))
 
 
 # Transforms a list of procedures putting the inner_term inside the innermost let/rec
@@ -541,7 +533,7 @@ def SA_PS(ps: [SSA_P], inner_term):
     p: SSA_P = ps[0]
 
     if len(ps) == 1:
-        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
+        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
 
         # args = p.args[::-1] If arguments should be given in backwards order
         # If so the back transformation function get_function_parameter_recursive must also be build in revers
@@ -555,7 +547,7 @@ def SA_PS(ps: [SSA_P], inner_term):
         let_rec = ANF_E_LETREC(v, first_term, inner_term, ssa_node=p)
     # If we have still more than one procedure we return a letrec of this proc using a recursive call to build the other procs as inner term
     else:
-        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_VAR(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
+        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label)))
 
         args = p.args
         while len(args) > 0:
