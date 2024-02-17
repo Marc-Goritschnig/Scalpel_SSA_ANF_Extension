@@ -71,7 +71,7 @@ function_mapping = {
     '_List_Slice_LU': '%s[%s:%s]',
     '_List_Slice_LUS': '%s[%s:%s:%s]',
     '_List_Slice_S': '%s[::%s]',
-    'tuple_get': '%s[%s]'
+    '_Tuple_Get': '%s[%s]'
 }
 
 # Global reference of the SSA AST to be transformed
@@ -903,9 +903,11 @@ def post_processing_anf_to_python(code):
             while (var + '[') in lines[i + j]:
                 vars.append(lines[i + j].split(' = ')[0].strip())
                 j += 1
-            parenthesis = line_strip.split(ORIGINAL_COMMENT_MARKER + ' SSA-Tuple')[1]
-            part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
-            part2 = '(' + value + ')' if parenthesis[1] == '1' else value
+            #parenthesis = line_strip.split(ORIGINAL_COMMENT_MARKER + ' SSA-Tuple')[1]
+            #part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
+            #part2 = '(' + value + ')' if parenthesis[1] == '1' else value
+            part1 = ', '.join(vars)
+            part2 = value
             output += indentation * ' ' + part1 + ' = ' + part2 + '\n'
             skip = len(vars) + 1
         elif ORIGINAL_COMMENT_MARKER + ' SSA-ListComp' in line or ORIGINAL_COMMENT_MARKER + ' SSA-SetComp' in line or ORIGINAL_COMMENT_MARKER + ' SSA-DictComp' in line:

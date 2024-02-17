@@ -714,6 +714,25 @@ def preprocess_py_code(code):
                 code = '\n'.join(lines)
                 replaced = True
                 break
+            elif (isinstance(node, ast.Assign)
+                  and (isinstance(node.targets[0], ast.Tuple)
+                    or isinstance(node.targets[0], ast.List)
+                    or isinstance(node.targets[0], ast2.List))):
+                tuple_name = get_buffer_var()
+
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                indentation = len(re.findall(r"^ *", line)[0])
+
+                lines[node.lineno - 1] = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-Tuple'
+                lines.insert(node.lineno, tuple_name + ' = ' + '_new_tuple_' + str(len(node.targets[0].elts)) + '(' + ','.join([ast.unparse(var) for var in node.value.elts]) + ')')
+                for idx, var in enumerate(node.targets[0].elts):
+                    lines.insert(node.lineno + idx + 1, (indentation * ' ') + var.id + ' = ' + '_Tuple_Get(' + tuple_name + ', ' + str(idx) + ')')
+
+                code = '\n'.join(lines)
+                replaced = True
+                break
+
             elif isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Subscript):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
@@ -999,13 +1018,14 @@ def replace_and_find_returning_loop_block(visited, block, find, replace_block):
 # Parse a Python statement
 def PS_S(prov_info, curr_block, stmt, st_nr):
     if isinstance(stmt, ast.Assign):
-        if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple) or isinstance(stmt.targets[0], ast.List) or isinstance(stmt.targets[0], ast2.List):
-            tuple_name = get_buffer_var()
-            post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_E_FUNC_CALL(SSA_V_VAR('tuple_get', pos_info=Position(stmt.value)), [SSA_V_VAR(tuple_name, pos_info=Position(stmt.value)), SSA_V_CONST(str(idx), pos_info=Position(stmt.value))]), pos_info=Position(stmt.value)) for idx, var in enumerate(stmt.targets[0].elts)]
-            parts = original_code_lines[stmt.lineno - 1].split(' = ')
-            parenthesis = '1' if '(' in parts[0] else '0'
-            parenthesis += '1' if '(' in parts[1] else '0'
-            return [SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-Tuple' + parenthesis)] + [SSA_E_ASS(SSA_V_VAR(tuple_name, pos_info=Position(stmt.targets[0])), PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position(stmt))] + post_stmts
+        # Was moved into preprocessing but can also be used here for other languages
+        #if isinstance(stmt.targets[0], ast.Tuple) or isinstance(stmt.targets[0], ast2.Tuple) or isinstance(stmt.targets[0], ast.List) or isinstance(stmt.targets[0], ast2.List):
+        #    tuple_name = get_buffer_var()
+        #    post_stmts = [SSA_E_ASS(PS_E(prov_info, curr_block, var, st_nr, False), SSA_E_FUNC_CALL(SSA_V_VAR('_Tuple_Get', pos_info=Position(stmt.value)), [SSA_V_VAR(tuple_name, pos_info=Position(stmt.value)), SSA_V_CONST(str(idx), pos_info=Position(stmt.value))]), pos_info=Position(stmt.value)) for idx, var in enumerate(stmt.targets[0].elts)]
+        #    parts = original_code_lines[stmt.lineno - 1].split(' = ')
+        #    parenthesis = '1' if '(' in parts[0] else '0'
+        #    parenthesis += '1' if '(' in parts[1] else '0'
+        #    return [SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-Tuple' + parenthesis)] + [SSA_E_ASS(SSA_V_VAR(tuple_name, pos_info=Position(stmt.targets[0])), PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position(stmt))] + post_stmts
         return [SSA_E_ASS(PS_E(prov_info, curr_block, stmt.targets[0], st_nr, False), PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position([stmt.targets[0], stmt.value]))]
     elif isinstance(stmt, ast.If):
         if_ref = SSA_E_GOTO(PS_B_REF(prov_info, curr_block.exits[0].target))
