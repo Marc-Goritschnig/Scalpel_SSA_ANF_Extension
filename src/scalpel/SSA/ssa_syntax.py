@@ -1137,7 +1137,7 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         return PS_MAP2(prov_info, curr_block, PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), stmt.ops, stmt.comparators, st_nr)
     elif isinstance(stmt, ast.Constant):
         if isinstance(stmt.value, str):
-            return SSA_V_CONST("'" + stmt.value + "'", pos_info=Position(stmt))
+            return SSA_V_CONST("'" + stmt.value.replace('\n', '\\n') + "'", pos_info=Position(stmt))
         else:
             return SSA_V_CONST(stmt.value, pos_info=Position(stmt))
     elif isinstance(stmt, ast.Slice):

@@ -3,6 +3,7 @@ import sys
 import re
 import argparse
 
+import ast as ast2
 import scalpel.ast_comments as ast
 from scalpel.config import NEW_COMMENT_MARKER
 
@@ -63,9 +64,9 @@ def transform():
         pass
     else:
         # Reformat the code
-        py_code = ast.unparse(ast.parse(py_code))
         x = ast.parse(py_code)
-
+        py_code = ast.unparse(ast.parse(py_code))
+        y = ast2.parse(py_code)
         # Create a SSA AST from python code
         ssa_ast = PY_to_SSA_AST(py_code, debug_mode)
         if output_syntax == 0:
