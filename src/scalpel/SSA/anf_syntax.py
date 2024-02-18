@@ -176,16 +176,23 @@ class ANF_E(ANF_EV):
         return None
 
 class ANF_E_APP(ANF_E):
-    def __init__(self, params: [ANF_V], name: ANF_V, ssa_node: SSANode = None):
+    def __init__(self, params: [ANF_V], name: ANF_V, ssa_node: SSANode = None, params_named: [str] = None):
         super().__init__(ssa_node=ssa_node)
         self.params: [ANF_V] = params
         self.name: ANF_V = name
+        self.params_named = params_named
+        if ssa_node is not None:
+            if hasattr(ssa_node, 'params_named'):
+                self.params_named: [str] = ssa_node.params_named
 
     def print(self, lvl = 0, prov_info: str = ''):
         return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
     def get_prov_info(self, prov_info):
-        return 'f' + self.name.get_prov_info(None) + self.print_prov_ext() + (PROV_INFO_SPLIT_CHAR if len(self.params) > 0 else '') + PROV_INFO_SPLIT_CHAR.join([var.get_prov_info(None) for var in self.params])
+        name_info = ''
+        if self.params_named is not None:
+            name_info = PROV_INFO_EXT_CHAR + 'names=' + ','.join(self.params_named)
+        return 'f' + self.name.get_prov_info(None) + name_info + self.print_prov_ext() + (PROV_INFO_SPLIT_CHAR if len(self.params) > 0 else '') + PROV_INFO_SPLIT_CHAR.join([var.get_prov_info(None) for var in self.params])
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         out = None
@@ -206,7 +213,7 @@ class ANF_E_APP(ANF_E):
                         out = (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
         if out is None:
             # Default output if nothing applies
-            out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]) + ')'
+            out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([ (self.params_named[idx - (len(self.params) - len(self.params_named))] + '=' if self.params_named is not None and len(self.params) - idx <= len(self.params_named) else '') + p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for idx, p in enumerate(self.params)]) + ')'
         lines = postprocessing_ANF_V_to_python(self, out).split('\n')
         lines = [get_indentation(lvl) + s for s in lines]
         return '\n'.join(lines)
@@ -746,7 +753,18 @@ def parse_anf_e_from_code(code_words, info_words):
         next_word = code_words[count]
 
     if count > 1:
-        return ANF_E_APP([parse_anf_v_from_code(code_words[i], info_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0], info_words[0][1:]))
+        # Read param naming prov info
+        names = None
+        if 'names=' in info_words[0]:
+            parts = info_words[0].split(PROV_INFO_EXT_CHAR)
+            parts2 = []
+            for part in parts:
+                if 'names=' in part:
+                    names = part.split('names=')[1].split(',')
+                else:
+                    parts2.append(part)
+            info_words[0] = PROV_INFO_EXT_CHAR.join(parts2)
+        return ANF_E_APP([parse_anf_v_from_code(code_words[i], info_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0], info_words[0][1:]), params_named=names)
     else:
         return parse_anf_v_from_code(code_words[0], info_words[0])
 

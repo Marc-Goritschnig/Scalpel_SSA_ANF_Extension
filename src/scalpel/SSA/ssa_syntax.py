@@ -224,10 +224,11 @@ class SSA_E(SSANode):
 
 
 class SSA_E_FUNC_CALL(SSA_E):
-    def __init__(self, name: SSA_L | SSA_V, args: [SSA_V], pos_info: Position = None):
+    def __init__(self, name: SSA_L | SSA_V, args: [SSA_V], pos_info: Position = None, params_named: [str] = None):
         super().__init__(pos_info=pos_info)
         self.name: SSA_L | SSA_V = name
         self.args: [SSA_V] = args
+        self.params_named: [str] = params_named
 
     def print(self, lvl):
         return f"{self.name.print(lvl) + print_args(self.args, lvl)}"
@@ -1123,11 +1124,15 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         pos = Position(stmt)
         return SSA_E_FUNC_CALL(SSA_V_VAR('_' + type(stmt.op).__name__, pos_info=pos), [PS_E(prov_info, curr_block, stmt.operand, st_nr, is_load)], pos_info=pos)
     elif isinstance(stmt, ast.Call):
+        keyword_args = [PS_E(prov_info, curr_block, arg.value, st_nr, is_load) for arg in stmt.keywords]
+        keyword_args_names = [arg.arg for arg in stmt.keywords]
+        if len(keyword_args_names) == 0:
+            keyword_args_names = None
         if isinstance(stmt.func, ast.Attribute):
             pos = Position(stmt)
-            return SSA_E_FUNC_CALL(SSA_V_VAR(stmt.func.attr, pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in ([stmt.func.value] + stmt.args)], pos_info=pos)
+            return SSA_E_FUNC_CALL(SSA_V_VAR(stmt.func.attr, pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in ([stmt.func.value] + stmt.args)] + keyword_args, pos_info=pos, params_named = keyword_args_names)
         else:
-            return SSA_E_FUNC_CALL(PS_E(prov_info, curr_block, stmt.func, st_nr, is_load), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args], pos_info=Position(stmt))
+            return SSA_E_FUNC_CALL(PS_E(prov_info, curr_block, stmt.func, st_nr, is_load), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.args] + keyword_args, pos_info=Position(stmt), params_named = keyword_args_names)
     elif isinstance(stmt, ast.Compare):
         return PS_MAP2(prov_info, curr_block, PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), stmt.ops, stmt.comparators, st_nr)
     elif isinstance(stmt, ast.Constant):
