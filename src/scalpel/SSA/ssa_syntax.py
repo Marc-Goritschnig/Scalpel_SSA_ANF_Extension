@@ -987,7 +987,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     next_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
     stmts2.append(SSA_E_ASS_PHI(next_iter_var, [old_iter_var, old_iter_var2]))
     buffer = get_buffer_var()
-    stmts2.append(SSA_E_ASS(SSA_V_VAR(buffer), SSA_E_FUNC_CALL(SSA_V_VAR('_' + ast.Is.__name__), [next_iter_var, SSA_V_VAR("None")])))
+    stmts2.append(SSA_E_ASS(SSA_V_VAR(buffer), SSA_E_FUNC_CALL(SSA_V_VAR('_' + ast.IsNot.__name__), [next_iter_var, SSA_V_VAR("None")])))
     if len(block.exits) == 1:
         else_ref = SSA_E_RET(None)
     else:
