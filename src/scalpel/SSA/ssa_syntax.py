@@ -444,16 +444,33 @@ def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B) -> [str]:
     var_names = []
     vars_for_jump = []
 
+    # Get all assigned variable names in the from block
     for e in b_from.terms:
         if isinstance(e, SSA_E_ASS):
             var_names.append(e.var.print(0))
 
+    # Go over all phi assignments in the target block
+    found = False
     for e in b_to.terms:
         if isinstance(e, SSA_E_ASS_PHI):
+            # If one of the variables was assigned in the from block we use it as parameter for the jump
             for phi_var in e.args:
                 if phi_var.print(0) in var_names:
+                    found = True
                     vars_for_jump.append(phi_var)
+            # If the variable was not found it was not set in this branch and we have to use the variable from the
+            # parent branch which corresponds to the smallest post index of the variables in e.args
+            min_val = 99999
+            var_found = ''
+            if not found:
+                for v in e.args:
+                    val = int(v.print(0).split('_')[-1])
+                    if val < min_val:
+                        min_val = val
+                        var_found = v
+                vars_for_jump.append(var_found)
 
+    # return parameters for the jump
     return vars_for_jump
 
 
