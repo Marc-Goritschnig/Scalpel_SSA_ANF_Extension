@@ -756,7 +756,10 @@ def preprocess_py_code(code):
                 line = lines[node.lineno - 1]
 
                 indentation = len(re.findall(r"^ *", line)[0])
-                var = node.targets[0].value.id
+                if isinstance(node.targets[0].value, ast.Attribute):
+                    var = ast.unparse(node.targets[0].value)
+                else:
+                    var = node.targets[0].value.id
                 slice = node.targets[0].slice
                 value = node.value
 
@@ -781,7 +784,8 @@ def preprocess_py_code(code):
                 params = ''
                 fun_name = '_obj_'
                 if lines[node.lineno - 1][node.end_col_offset:].startswith('('):
-                    params = lines[node.lineno - 1][node.end_col_offset+1:].split(')')[0]
+                    closingIdx = getNextClosingParenthesisIdx(lines[node.lineno - 1][node.end_col_offset+1:])
+                    params = lines[node.lineno - 1][node.end_col_offset+1:node.end_col_offset+1+closingIdx]
                     lines[node.lineno - 1] = line.replace(var + '.' + attr + '(' + params + ')', buffer_var)
                     params = ', ' + params if len(params) > 0 else ''
                     fun_name = '_obj2_'
@@ -801,6 +805,17 @@ def preprocess_py_code(code):
     code = code.replace('temp_ssa_parsing_buffer_', '%_')
     return code
 
+def getNextClosingParenthesisIdx(text):
+    opened = 0
+    for t in range(len(text)):
+        if text[t] == ')':
+            if opened == 0:
+                return t
+            else:
+                opened -= 1
+        elif text[t] == '(':
+            opened += 1
+    return -1
 
 def PY_to_SSA_AST(code_str: str, debug: bool):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names, debug_mode, original_code_lines

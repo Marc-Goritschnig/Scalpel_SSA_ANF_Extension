@@ -694,7 +694,8 @@ def print_anf_with_prov_info(anf_parent: ANFNode):
 def parse_anf_from_text(code: str):
     code = code.strip()
     lines = code.split('\n')
-    code_lines, info_lines = zip(*[tuple(line.split(PROV_INFO_MARKER)) for line in lines])
+    a = [tuple(line.rsplit(PROV_INFO_MARKER, 1)) for line in lines]
+    code_lines, info_lines = zip(*[tuple(line.rsplit(PROV_INFO_MARKER, 1)) for line in lines])
     code_lines = [line if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else re.sub(' +', ' ', line) for line in code_lines]
     code_words = []
 
