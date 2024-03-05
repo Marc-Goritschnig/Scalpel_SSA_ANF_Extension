@@ -743,7 +743,14 @@ def preprocess_py_code(code):
                 indentation = len(re.findall(r"^ *", line)[0])
 
                 lines[node.lineno - 1] = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-Tuple'
-                lines.insert(node.lineno, tuple_name + ' = ' + '_new_tuple_' + str(len(node.targets[0].elts)) + '(' + ','.join([ast.unparse(var) for var in node.value.elts]) + ')')
+                # If value side contains multiple values
+                if hasattr(node.value, 'elts'):
+                    lines.insert(node.lineno,
+                                 (indentation * ' ') + tuple_name + ' = ' + '_new_tuple_' + str(len(node.targets[0].elts)) + '(' + ','.join(
+                                     [ast.unparse(var) for var in node.value.elts]) + ')')
+                else:
+                    # If value side contains just one value like a function call which will return multiple values
+                    lines.insert(node.lineno, (indentation * ' ') + tuple_name + ' = ' + ast.unparse(node.value))
                 for idx, var in enumerate(node.targets[0].elts):
                     lines.insert(node.lineno + idx + 1, (indentation * ' ') + var.id + ' = ' + '_Tuple_Get(' + tuple_name + ', ' + str(idx) + ')')
 
@@ -1004,10 +1011,17 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     stmts.append(SSA_E_ASS(SSA_V_VAR(iter_var), PS_E(prov_info, block, stmt.iter, 0, False)))
 
     old_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
-    var_name, idx = old_iter_var.name.rsplit('_')
-    old_iter_var.name = var_name + '_' + str(int(idx) - 1)
+    if hasattr(old_iter_var.name, 'name'):
+        var_name, idx = old_iter_var.name.name.rsplit('_', 1)
+        old_iter_var.name.name = var_name + '_' + str(int(idx) - 1)
+    else:
+        var_name, idx = old_iter_var.name.rsplit('_', 1)
+        old_iter_var.name = var_name + '_' + str(int(idx) - 1)
     old_iter_var2 = PS_E(prov_info, block, stmt.target, 0, False)
-    old_iter_var2.name = old_iter_var2.name + '_2'
+    if hasattr(old_iter_var.name, 'name'):
+        old_iter_var2.name.name = old_iter_var2.name.name + '_2'
+    else:
+        old_iter_var2.name = old_iter_var2.name + '_2'
     stmts.append(SSA_E_ASS(old_iter_var, SSA_E_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)])))
     stmts.append(SSA_E_GOTO(SSA_L(new_block_name)))
 
@@ -1170,21 +1184,27 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         pos = Position(stmt)
         return SSA_E_FUNC_CALL(SSA_V_VAR('_new_list_' + str(len(stmt.elts)), pos_info=pos), [PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in stmt.elts], pos_info=pos)
     elif isinstance(stmt, ast.Subscript):
-        if isinstance(stmt.slice, ast.Slice):
-            appendix = ""
-            if stmt.slice.lower is not None:
-                appendix += "L"
-            if stmt.slice.upper is not None:
-                appendix += "U"
-            if stmt.slice.step is not None:
-                appendix += "S"
-            if len(appendix) > 0:
-                appendix = "_" + appendix
-            pos = Position(stmt)
-            return SSA_E_FUNC_CALL(SSA_V_VAR('_List_Slice' + appendix, pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [stmt.slice.lower, stmt.slice.upper, stmt.slice.step] if arg is not None]), pos_info=pos)
-        else:
-            pos = Position(stmt)
-            return SSA_E_FUNC_CALL(SSA_V_VAR('_LSD_Get', pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)] + [PS_E(prov_info, curr_block, stmt.slice, st_nr, is_load)], pos_info=pos)
+        elts = [stmt.slice]
+        out = PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)
+        if isinstance(stmt.slice, ast.Tuple):
+            elts = stmt.slice.elts
+        for elt in elts:
+            if isinstance(elt, ast.Slice):
+                appendix = ""
+                if elt.lower is not None:
+                    appendix += "L"
+                if elt.upper is not None:
+                    appendix += "U"
+                if elt.step is not None:
+                    appendix += "S"
+                if len(appendix) > 0:
+                    appendix = "_" + appendix
+                pos = Position(elt)
+                out = SSA_E_FUNC_CALL(SSA_V_VAR('_List_Slice' + appendix, pos_info=pos), [out] + ([PS_E(prov_info, curr_block, arg, st_nr, is_load) for arg in [elt.lower, elt.upper, elt.step] if arg is not None]), pos_info=pos)
+            else:
+                pos = Position(elt)
+                out = SSA_E_FUNC_CALL(SSA_V_VAR('_LSD_Get', pos_info=pos), [out] + [PS_E(prov_info, curr_block, elt, st_nr, is_load)], pos_info=pos)
+        return out
     elif isinstance(stmt, ast.Attribute):
         pos = Position(stmt)
         return SSA_E_FUNC_CALL(SSA_V_VAR(stmt.attr, pos_info=pos), [PS_E(prov_info, curr_block, stmt.value, st_nr, is_load)], pos_info=pos)

@@ -64,6 +64,7 @@ function_mapping = {
     '_Pass': 'pass',
     '_Break': 'break',
     '_Continue': 'continue',
+    '_List_Slice': '%s[:]',
     '_List_Slice_L': '%s[%s:]',
     '_List_Slice_U': '%s[:%s]',
     '_List_Slice_US': '%s[:%s:%s]',

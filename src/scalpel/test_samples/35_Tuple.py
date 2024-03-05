@@ -8,3 +8,5 @@ x1 = z[0]
 print('123')
 x2 = z[1]
 (a, b, c2) = (1, 2, 3)
+def aaa():
+    X, y, X_submission = load_data.load()
