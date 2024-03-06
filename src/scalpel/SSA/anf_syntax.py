@@ -879,6 +879,17 @@ def post_processing_anf_to_python(code):
         elif ORIGINAL_COMMENT_MARKER + ' SSA-Import' in line:
             lines[i + 1] = lines[i + 1][2:]
             lines[i] = ''
+        elif ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptMultiDim-' in line:
+            info = lines[i].split('SSA-SubscriptMultiDim-')[1]
+            #var, count = info.split('-')
+            #line = lines[i + 1]
+            #pattern = re.escape(var) + r'\[[^\]]*\]' * int(count)
+            #content = re.search(pattern, line).group(0)
+            #line = line.replace(content, content.replace('][', ','))
+            line = lines[i + 1].replace(' ', '')
+            line = line.replace(info, info.replace('][', ','))
+            lines[i + 1] = line
+            lines[i] = ''
         elif '_str_format' in line_strip:
             v3 = None
             if '_str_format2' in line_strip:
