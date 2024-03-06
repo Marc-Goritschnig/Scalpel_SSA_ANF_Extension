@@ -72,7 +72,9 @@ function_mapping = {
     '_List_Slice_LU': '%s[%s:%s]',
     '_List_Slice_LUS': '%s[%s:%s:%s]',
     '_List_Slice_S': '%s[::%s]',
-    '_Tuple_Get': '%s[%s]'
+    '_Tuple_Get': '%s[%s]',
+    '_Starred': '*%s',
+    '_Starred2': '**%s'
 }
 
 # Global reference of the SSA AST to be transformed
@@ -697,7 +699,7 @@ def parse_anf_from_text(code: str):
     lines = code.split('\n')
     a = [tuple(line.rsplit(PROV_INFO_MARKER, 1)) for line in lines]
     code_lines, info_lines = zip(*[tuple(line.rsplit(PROV_INFO_MARKER, 1)) for line in lines])
-    code_lines = [line if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else re.sub(' +', ' ', line) for line in code_lines]
+    code_lines = [line if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else trim_double_spaces(line, NEW_COMMENT_MARKER) for line in code_lines]
     code_words = []
 
     for line in code_lines:
@@ -886,7 +888,7 @@ def post_processing_anf_to_python(code):
             #pattern = re.escape(var) + r'\[[^\]]*\]' * int(count)
             #content = re.search(pattern, line).group(0)
             #line = line.replace(content, content.replace('][', ','))
-            line = lines[i + 1].replace(' ', '')
+            line = replaceSpaces(lines[i + 1])
             line = line.replace(info, info.replace('][', ','))
             lines[i + 1] = line
             lines[i] = ''

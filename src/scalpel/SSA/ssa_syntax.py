@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from scalpel import ast_comments as ast
 from scalpel.core.mnode import MNode
 from scalpel.SSA.const import SSA
-from scalpel.functions import get_global_unique_name, get_global_unique_name_with_update
+from scalpel.functions import get_global_unique_name, get_global_unique_name_with_update, replaceSpaces
 from scalpel.config import ORIGINAL_COMMENT_MARKER, NEW_COMMENT_MARKER
 
 debug_mode = True
@@ -551,6 +551,12 @@ def preprocess_py_code(code):
             print(code)
             print('')
         code = code.replace('%_', 'temp_ssa_parsing_buffer_')
+
+        # Find ** Double Starred kwargs etc.
+        #code = replaceSpaces(code)
+        #code.replace
+
+
         tree = ast.parse(code)
         replaced = False
         for node in ast.walk(tree):
@@ -767,7 +773,7 @@ def preprocess_py_code(code):
                     indentation = len(re.findall(r"^ *", line)[0])
                     line = line.replace(original, changed)
                     lines[node.lineno - 1] = line
-                    new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptMultiDim-' + changed.replace(' ', '')
+                    new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptMultiDim-' + replaceSpaces(changed)
                     lines.insert(node.lineno - 1, new_code)
                     code = '\n'.join(lines)
                     replaced = True
@@ -793,6 +799,15 @@ def preprocess_py_code(code):
                 break
             elif isinstance(node, ast.Call):
                 pass
+            elif isinstance(node, ast.Starred):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+
+                var = ast.unparse(node)
+                lines[node.lineno - 1] = line.replace(var, '_Starred(' + var[1:] + ')')
+                code = '\n'.join(lines)
+                replaced = True
+                break
             elif isinstance(node, ast.Attribute):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
