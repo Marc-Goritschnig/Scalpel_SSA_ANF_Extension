@@ -553,9 +553,9 @@ def preprocess_py_code(code):
         code = code.replace('%_', 'temp_ssa_parsing_buffer_')
 
         # Find ** Double Starred kwargs etc.
-        code = replaceSpaces(code, ORIGINAL_COMMENT_MARKER)
+        # code = replaceSpaces(code, ORIGINAL_COMMENT_MARKER)
         # Define the regular expression pattern
-        pattern = r'(?<=\W)\*\*([a-zA-Z0-9_]+)'
+        pattern = r'(?<=\W) *\*\*([a-zA-Z0-9_]+)'
         # Define a lambda function to determine replacement
         replacer = lambda match: f'_Starred2({match.group(1)})'
         # Perform the replacement using re.sub()
@@ -769,7 +769,7 @@ def preprocess_py_code(code):
                 break
             elif isinstance(node, ast.Subscript):
 
-                original = replaceSpaces(ast.unparse(node), ORIGINAL_COMMENT_MARKER)
+                original = ast.unparse(node)
                 if ',' in original:
                     changed = original.replace(',', '][')
                     lines = code.split('\n')
