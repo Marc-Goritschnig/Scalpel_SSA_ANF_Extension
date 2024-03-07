@@ -257,7 +257,10 @@ class ANF_E_LET(ANF_E):
         self.term2: ANF_E = term2
 
     def print(self, lvl = 0, prov_info: str = ''):
-        return get_indentation(lvl) + f"let {self.var.print(lvl + 1)} = {self.term1.print(0)} in \n{self.term2.print(lvl + 1)}"
+        next_lvl = lvl + 1
+        if isinstance(self.term2, ANF_E_LET) or isinstance(self.term2, ANF_E_COMM):
+            next_lvl = lvl
+        return get_indentation(lvl) + f"let {self.var.print(next_lvl)} = {self.term1.print(0)} in \n{self.term2.print(next_lvl)}"
 
     def get_prov_info(self, prov_info):
         return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
