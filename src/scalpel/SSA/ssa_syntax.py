@@ -553,9 +553,13 @@ def preprocess_py_code(code):
         code = code.replace('%_', 'temp_ssa_parsing_buffer_')
 
         # Find ** Double Starred kwargs etc.
-        #code = replaceSpaces(code)
-        #code.replace
-
+        code = replaceSpaces(code, ORIGINAL_COMMENT_MARKER)
+        # Define the regular expression pattern
+        pattern = r'(?<=\W)\*\*([a-zA-Z0-9_]+)'
+        # Define a lambda function to determine replacement
+        replacer = lambda match: f'_Starred2({match.group(1)})'
+        # Perform the replacement using re.sub()
+        code = re.sub(pattern, replacer, code)
 
         tree = ast.parse(code)
         replaced = False
@@ -765,7 +769,7 @@ def preprocess_py_code(code):
                 break
             elif isinstance(node, ast.Subscript):
 
-                original = ast.unparse(node)
+                original = replaceSpaces(ast.unparse(node), ORIGINAL_COMMENT_MARKER)
                 if ',' in original:
                     changed = original.replace(',', '][')
                     lines = code.split('\n')
@@ -773,7 +777,7 @@ def preprocess_py_code(code):
                     indentation = len(re.findall(r"^ *", line)[0])
                     line = line.replace(original, changed)
                     lines[node.lineno - 1] = line
-                    new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptMultiDim-' + replaceSpaces(changed)
+                    new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptMultiDim-' + replaceSpaces(changed, ORIGINAL_COMMENT_MARKER)
                     lines.insert(node.lineno - 1, new_code)
                     code = '\n'.join(lines)
                     replaced = True

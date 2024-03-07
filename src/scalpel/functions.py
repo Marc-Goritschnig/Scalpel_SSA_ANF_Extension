@@ -1,10 +1,23 @@
 import re
 
 
-def replaceSpaces(text):
-    pattern = r"'[^']*'| "  # Matches content within single quotes or spaces
-    replacer = lambda match: match.group(0) if match.group(0).startswith("'") else ""
-    return re.sub(pattern, replacer, text)
+def replaceSpaces(text, comm_char):
+    lines = text.split('\n')
+    trimmed_lines = []
+    for line in lines:
+        if re.match(r'^\s*' + comm_char, line):
+            trimmed_lines.append(line)
+            continue
+        pattern = r"'[^']*'| "  # Matches content within single quotes or spaces
+        replacer = lambda match: match.group(0) if match.group(0).startswith("'") else ""
+
+        leading_spaces = re.match(r'^\s*', line).group()
+        trailing_spaces = re.search(r'\s*$', line).group()
+
+        trimmed_line = leading_spaces + re.sub(pattern, replacer, line) + trailing_spaces
+        trimmed_lines.append(trimmed_line)
+
+    return '\n'.join(trimmed_lines)
 
 
 def trim_double_spaces(text, comm_char):
