@@ -911,6 +911,7 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
 def sort_blocks(blocks):
     # blocks.sort(key=lambda x: x.id)
     # print([b.id for b in blocks])
+    # blocks.reverse()
     return blocks
 
 
