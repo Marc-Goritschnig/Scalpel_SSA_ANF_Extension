@@ -887,8 +887,8 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
 
     DF = m_ssa.compute_DF(cfg.get_all_blocks())
 
-    a = cfg.get_all_blocks()
-    main_cfg_proc = PS_BS(ProvInfo(), sort_blocks(cfg.get_all_blocks(), DF))
+    main_cfg_blocks = PS_BS(ProvInfo(), cfg.get_all_blocks())
+    main_cfg_blocks = sort_SSA_blocks(main_cfg_blocks, DF)
     # Update global tracking variables of used variable names etc for main CFG
     update_used_vars(ssa_results_stored, const_dict)
     prov_info.parent_vars.update(get_used_vars(ssa_results_stored, const_dict))
@@ -900,7 +900,7 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
     # procs += [PS_FS(prov_info, cfg.class_cfgs, cfg.class_args, m_ssa)]
 
     # Create SSA AST
-    ssa_ast = SSA_AST(procs, main_cfg_proc, code_str)
+    ssa_ast = SSA_AST(procs, main_cfg_blocks, code_str)
 
     if debug_mode:
         print('Main CFG SSA paring variable results:')
@@ -922,15 +922,32 @@ def sort_blocks(blocks, DF):
     def compare(b1, b2):
         b1 = b1.id
         b2 = b2.id
-        if b1 in DF[b2]:
-            return -1
-        if b2 in DF[b1]:
-            return 1
+        #if b1 in DF[b2]:
+        #    return -1
+        #if b2 in DF[b1]:
+        #    return 1
         return int(b1) - int(b2)
 
     # Calling
-    blocks.sort(key=cmp_to_key(compare))
-    #blocks.reverse()
+    # blocks.sort(key=cmp_to_key(compare))
+
+    blocks.reverse()
+    first = blocks[0]
+    for b in blocks:
+        if b.id < first.id:
+            first = b
+    blocks = [first] + [b for b in blocks if b != first]
+    return blocks
+
+# Sorts the blocks
+def sort_SSA_blocks(blocks, DF):
+
+    blocks.reverse()
+    first = blocks[0]
+    for b in blocks:
+        if int(b.label.label) < int(first.label.label):
+            first = b
+    blocks = [first] + [b for b in blocks if b != first]
     return blocks
 
 
@@ -982,7 +999,8 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa, parent_fun_name=None):
 
         DF = m_ssa.compute_DF(cfg.get_all_blocks())
 
-        parsed_blocks = PS_BS(prov_info, sort_blocks(cfg.get_all_blocks(), DF))
+        parsed_blocks = PS_BS(prov_info, cfg.get_all_blocks())
+        parsed_blocks = sort_SSA_blocks(parsed_blocks, DF)
         if parent_fun_name is not None:
             parsed_blocks[0].terms = [SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-WithinFun-' + parent_fun_name)] + parsed_blocks[0].terms
         fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), ssa_args, parsed_blocks, pos_info=Position(cfg.ast_node))
