@@ -257,9 +257,9 @@ class ANF_E_LET(ANF_E):
         self.term2: ANF_E = term2
 
     def print(self, lvl = 0, prov_info: str = ''):
-        next_lvl = lvl + 1
-        if isinstance(self.term2, ANF_E_LET) or isinstance(self.term2, ANF_E_COMM):
-            next_lvl = lvl
+        next_lvl = lvl #+ 1
+        #if isinstance(self.term2, ANF_E_LET) or isinstance(self.term2, ANF_E_COMM):
+        #    next_lvl = lvl
         return get_indentation(lvl) + f"let {self.var.print(next_lvl)} = {self.term1.print(0)} in \n{self.term2.print(next_lvl)}"
 
     def get_prov_info(self, prov_info):
@@ -536,7 +536,7 @@ def SA(ssa_ast: SSA_AST):
 
     # Transform all procedures of the SSA AST and put the call of the first block as inner most term
     first_block = get_first_block_in_proc(ssa_ast.blocks)
-    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + str(first_block.label.label), is_block_id=True), ssa_node=first_block)))
+    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + str(first_block.label.label), is_block_id=True), ssa_node=first_block), True))
 
 
 # Transforms a list of procedures putting the inner_term inside the innermost let/rec
@@ -549,7 +549,7 @@ def SA_PS(ps: [SSA_P], inner_term):
     p: SSA_P = ps[0]
 
     if len(ps) == 1:
-        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label, is_block_id=True)))
+        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label, is_block_id=True)), True)
 
         # args = p.args[::-1] If arguments should be given in backwards order
         # If so the back transformation function get_function_parameter_recursive must also be build in revers
@@ -563,7 +563,7 @@ def SA_PS(ps: [SSA_P], inner_term):
         let_rec = ANF_E_LETREC(v, first_term, inner_term, ssa_node=p)
     # If we have still more than one procedure we return a letrec of this proc using a recursive call to build the other procs as inner term
     else:
-        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label, is_block_id=True)))
+        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label, is_block_id=True)), True)
 
         args = p.args
         while len(args) > 0:
@@ -578,11 +578,12 @@ def SA_PS(ps: [SSA_P], inner_term):
 
 
 # Transform a list of SSA blocks
-def SA_BS(bs: [SSA_B], inner_call):
+def SA_BS(bs: [SSA_B], inner_call, first_block=False):
     if len(bs) == 0:
         return inner_call
     b: SSA_B = bs[0]
     block_vars = [SA_V(phi_var) for phi_var in get_phi_vars_in_block(b)]
+
 
     # Create self containing functions to build lambda functions in each other. leading to have functions with multiple variables
     if len(block_vars) > 0:
@@ -595,10 +596,18 @@ def SA_BS(bs: [SSA_B], inner_call):
     else:
         func = SA_ES(b, b.terms)
 
+    if first_block:
+        inner_call, func = func, inner_call
+
     if len(bs) == 1:
-        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), func, inner_call, ssa_node=b)
+        in_block = inner_call
     else:
-        let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), func, SA_BS(bs[1:], inner_call), ssa_node=b)
+        in_block = SA_BS(bs[1:], inner_call)
+
+    if first_block:
+        in_block, func = func, in_block
+
+    let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), func, in_block, ssa_node=b)
 
     return let_rec
 

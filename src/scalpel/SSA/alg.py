@@ -134,6 +134,21 @@ def dominance_frontiers(G, start):
     return df
 
 
+def dominator_tree(G, start):
+
+    idom = immediate_dominators(G, start)
+
+    d_tree = [u for u in idom]
+    #for u in idom:
+    #    if len(G.pred[u]) >= 2:
+    #        for v in G.pred[u]:
+    #            if v in idom:
+    #                while v != idom[u]:
+    #                    df[v].add(u)
+    #                    v = idom[v]
+    #return df
+
+
 def main():
     G = nx.DiGraph([(1, 2), (1, 3), (2, 5), (3, 4), (4, 5)])
     res = sorted((u, sorted(df)) for u, df in dominance_frontiers(G, 1).items())

@@ -2,6 +2,7 @@ from __future__ import annotations
 import re
 import ast as ast2
 from collections.abc import Iterable
+from functools import cmp_to_key
 
 from scalpel import ast_comments as ast
 from scalpel.core.mnode import MNode
@@ -12,6 +13,8 @@ from scalpel.config import ORIGINAL_COMMENT_MARKER, NEW_COMMENT_MARKER
 debug_mode = True
 font = {'assign': '←',
         'phi': 'φ'}
+
+block_identifier = 'L'
 
 buffer_var_name = '_SSA_'
 
@@ -348,14 +351,14 @@ class SSA_B(SSANode):
 
     def print(self, lvl):
         new_line = '\n'
-        return get_indentation(lvl) + f"{'L' + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
+        return get_indentation(lvl) + f"{block_identifier + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
 
     def print_latex(self, lvl):
         return ""
 
     def parse_to_python(self, lvl):
         new_line = '\n'
-        return get_indentation(lvl) + f"{'L' + self.label.parse_to_python(lvl+1) + ': ' + new_line + print_terms_to_python(self.terms, lvl+1)}"
+        return get_indentation(lvl) + f"{block_identifier + self.label.parse_to_python(lvl+1) + ': ' + new_line + print_terms_to_python(self.terms, lvl+1)}"
 
 
 class SSA_P(SSANode):
@@ -881,7 +884,11 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
     # Compute the phi nodes of the main CFG
     ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names)
     # Parse the main CFG
-    main_cfg_proc = PS_BS(ProvInfo(), sort_blocks(cfg.get_all_blocks()))
+
+    DF = m_ssa.compute_DF(cfg.get_all_blocks())
+
+    a = cfg.get_all_blocks()
+    main_cfg_proc = PS_BS(ProvInfo(), sort_blocks(cfg.get_all_blocks(), DF))
     # Update global tracking variables of used variable names etc for main CFG
     update_used_vars(ssa_results_stored, const_dict)
     prov_info.parent_vars.update(get_used_vars(ssa_results_stored, const_dict))
@@ -908,10 +915,22 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
 
 
 # Sorts the blocks
-def sort_blocks(blocks):
+def sort_blocks(blocks, DF):
     # blocks.sort(key=lambda x: x.id)
     # print([b.id for b in blocks])
     # blocks.reverse()
+    def compare(b1, b2):
+        b1 = b1.id
+        b2 = b2.id
+        if b1 in DF[b2]:
+            return -1
+        if b2 in DF[b1]:
+            return 1
+        return int(b1) - int(b2)
+
+    # Calling
+    blocks.sort(key=cmp_to_key(compare))
+    #blocks.reverse()
     return blocks
 
 
@@ -961,7 +980,9 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa, parent_fun_name=None):
         # Compute the phi nodes of the current function CFG
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars, function_vars=[arg.arg for arg in args])
 
-        parsed_blocks = PS_BS(prov_info, sort_blocks(cfg.get_all_blocks()))
+        DF = m_ssa.compute_DF(cfg.get_all_blocks())
+
+        parsed_blocks = PS_BS(prov_info, sort_blocks(cfg.get_all_blocks(), DF))
         if parent_fun_name is not None:
             parsed_blocks[0].terms = [SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-WithinFun-' + parent_fun_name)] + parsed_blocks[0].terms
         fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), ssa_args, parsed_blocks, pos_info=Position(cfg.ast_node))

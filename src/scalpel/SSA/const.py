@@ -601,13 +601,13 @@ class SSA:
             G.add_node(block.id)
             exits = block.exits
             preds = block.predecessors
-            for link in preds+exits:
+            for link in preds + exits:
                 G.add_edge(link.source.id, link.target.id)
 
         # Add entry edge 0-1 and set starting node to 0
         # -> so that the entry node is not in its own immediate dominator set
         # This is due to a wrong behaviour of the nx library
-        #G.add_edge(0, entry_block.id)
+        # G.add_edge(0, entry_block.id)
 
         # TODO: Check for networkx to implement fixes in idom calculation (idom = {start: None})
         #       and in dominance frontiers to extend the if with (or u == start)
@@ -621,4 +621,34 @@ class SSA:
         G.add_edge(0, entry_block.id)
         DF = nx.dominance_frontiers(G, 0)
         return DF
+
+    def compute_DTree(self, ssa_blocks):
+        """
+        Compute dominating frontiers for each of blocks
+        Args:
+            ssa_blocks: blocks from a control flow graph.
+        """
+        # construct the Graph
+        entry_block = ssa_blocks[0]
+        G = nx.DiGraph()
+        for block in ssa_blocks:
+            G.add_node(block.id)
+            exits = block.exits
+            preds = block.predecessors
+            for link in preds+exits:
+                G.add_edge(link.source.id, link.target.id)
+
+        # Use this implementation if the library is not changed
+
+        # Add entry edge 0-1 and set starting node to 0
+        # -> so that the entry node is not in its own immediate dominator set
+        # This is due to a wrong behaviour of the nx library
+        G.add_edge(0, entry_block.id)
+        idom = nx.immediate_dominators(G, 0)
+
+        df = {u: set() for u in idom}
+        for u in idom:
+            pass
+
+        return None
 
