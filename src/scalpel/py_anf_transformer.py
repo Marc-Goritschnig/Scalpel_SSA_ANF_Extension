@@ -15,7 +15,7 @@ print(content_root)
 if content_root not in sys.path:
     sys.path.append(content_root)
 
-from scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info
+from scalpel.SSA.anf_syntax import parse_ssa_to_anf, parse_anf_from_text, print_anf_with_prov_info, print_anf_code_to_python
 from scalpel.SSA.ssa_syntax import PY_to_SSA_AST, parse_ssa_to_python
 
 output_folder = 'output'
@@ -116,17 +116,19 @@ def transform():
         if only_parse_back:
             parsed = parse_anf_from_text(py_code)
         else:
-            with open(output_folder + '/' + anf_with_prov_file, 'r', encoding="utf-8") as f:
-                # Parsing the anf code back to internal representation of anf
-                parsed = parse_anf_from_text(f.read())
+            #with open(output_folder + '/' + anf_with_prov_file, 'r', encoding="utf-8") as f:
+            #    # Parsing the anf code back to internal representation of anf
+            #    parsed = parse_anf_from_text(f.read())
+#
+#                if debug_mode:
+#                    print('Parsed anf tree printed:')
+#                    print(trim_double_spaces(parsed.print(0), NEW_COMMENT_MARKER))
+#                    print('\n\n\n')
+            parsed = parse_anf_from_text(anf_w_prov)
 
-                if debug_mode:
-                    print('Parsed anf tree printed:')
-                    print(trim_double_spaces(parsed.print(0), NEW_COMMENT_MARKER))
-                    print('\n\n\n')
 
         # Parsing the anf code back to Python
-        anf_to_python = parsed.parse_anf_to_python({}, [], [])
+        anf_to_python = print_anf_code_to_python(parsed)
         # if debug_mode:
             # print('Parsed Python code from ANF to Python test printed:')
             # print(ast.unparse(ast.parse(anf_to_python)))
@@ -137,9 +139,10 @@ def transform():
             # print('\n\n\n')
             # print('\n\n\n')
 
-        #print(anf_to_python)
+        # print(anf_to_python)
         x = ast.parse(anf_to_python)
-        print(add_missing_blank_lines(add_missing_blank_lines(ast.unparse(x))))
+        # print(ast.unparse(x))
+        print(add_missing_blank_lines(ast.unparse(x)).rstrip())
 
     # Transform the ast tree back to Python
     # TODO: Implementation of back transformation
@@ -149,10 +152,11 @@ def transform():
     # TODO: LATEX format prints
 
 def test_link(path: str, back: bool):
-    global python_code_path, debug_mode, parse_back
+    global python_code_path, debug_mode, parse_back, no_pos
     python_code_path = path
     debug_mode = False
     parse_back = back
+    no_pos = True
     transform()
 
 
@@ -161,7 +165,7 @@ def add_missing_blank_lines(input_code):
     tree = ast.parse(input_code)
 
     # Helper function to add two blank lines after the end of a function block
-    def add_blank_lines(node):
+    def add_blank_lines(node, two_blank_lines: bool):
         lines = input_code.split('\n')
         end_lineno = node.end_lineno  # Line number of the last line of the function block
         added = False
@@ -169,9 +173,10 @@ def add_missing_blank_lines(input_code):
         # Check if there are no blank lines after the function block
         if end_lineno < len(lines) and lines[end_lineno].strip() != '':
             lines.insert(end_lineno, '')  # Add a blank line after the end of the function block
-            lines.insert(end_lineno, '')  # Add a blank line after the end of the function block
+            if two_blank_lines:
+                lines.insert(end_lineno, '')  # Add a blank line after the end of the function block
             added = True
-        elif end_lineno < len(lines) - 1 and lines[end_lineno + 1].strip() != '':
+        elif two_blank_lines and end_lineno < len(lines) - 1 and lines[end_lineno + 1].strip() != '':
             lines.insert(end_lineno, '')  # Add a blank line after the end of the function block
             added = True
 
@@ -181,14 +186,23 @@ def add_missing_blank_lines(input_code):
 
     # recursively call the function until no more lines are added
     added = False
-    for node in ast.walk(tree):
+    for node in list(ast.iter_child_nodes(tree)):
         added = False
         if isinstance(node, ast.FunctionDef):
-            new_code, added = add_blank_lines(node)
+            # top-level function definition
+            new_code, added = add_blank_lines(node, True)
         if added:
             break
+    if not added:
+        for node in ast.walk(tree):
+            added = False
+            if isinstance(node, ast.FunctionDef):
+                # top-level function definition
+                new_code, added = add_blank_lines(node, False)
+            if added:
+                break
     if added:
-        add_missing_blank_lines(new_code)
+        return add_missing_blank_lines(new_code)
     return new_code
 
 

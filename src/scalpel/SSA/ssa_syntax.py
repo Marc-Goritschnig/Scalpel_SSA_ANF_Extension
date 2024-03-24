@@ -343,15 +343,21 @@ class SSA_E_IF_ELSE(SSA_E):
 
 
 class SSA_B(SSANode):
-    def __init__(self, label: SSA_L, terms: [SSA_E], first_in_proc: bool, pos_info: Position = None):
+    def __init__(self, label: SSA_L, terms: [SSA_E], blocks: [SSA_B], first_in_proc: bool, pos_info: Position = None):
         super().__init__(pos_info=pos_info)
         self.label: SSA_L = label
         self.terms: [SSA_E] = terms
+        self.blocks: [SSA_E] = blocks
         self.first_in_proc: bool = first_in_proc
 
     def print(self, lvl):
         new_line = '\n'
-        return get_indentation(lvl) + f"{block_identifier + self.label.print(lvl+1) + ': ' + new_line + print_terms(self.terms, lvl+1)}"
+        blocks = ''
+        blocks_pre = ''
+        if self.blocks is not None and len(self.blocks) > 0:
+            blocks_pre = '{'
+            blocks = ''.join([b.print(lvl+1) for b in self.blocks]) + '\n' + get_indentation(lvl) + '}'
+        return get_indentation(lvl) + f"{block_identifier + self.label.print(lvl+1) + ': '+ blocks_pre  + new_line + print_terms(self.terms, lvl+1) + new_line + new_line + blocks }"
 
     def print_latex(self, lvl):
         return ""
@@ -424,15 +430,24 @@ def print_terms_to_python(terms: [SSANode], lvl):
 def get_indentation(nesting_lvl):
     return '  ' * nesting_lvl
 
+def get_block_by_id_blocks(blocks: [SSA_B], b_id: str) -> SSA_B | None:
+    for b in blocks:
+        if b.label.label == b_id:
+            return b
+        if b.blocks is not None and len(b.blocks) > 0:
+            b = get_block_by_id_blocks(b.blocks, b_id)
+            if b is not None:
+                return b
+
 
 def get_block_by_id(ssa_ast: SSA_AST, b_id: str) -> SSA_B | None:
     for p in ssa_ast.procs:
-        for b in p.blocks:
-            if b.label.label == b_id:
-                return b
-    for b in ssa_ast.blocks:
-        if b.label.label == b_id:
+        b = get_block_by_id_blocks(p.blocks, b_id)
+        if b is not None:
             return b
+    b = get_block_by_id_blocks(ssa_ast.blocks, b_id)
+    if b is not None:
+        return b
     return None
 
 
@@ -479,9 +494,10 @@ def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B) -> [str]:
 
 
 def get_first_block_in_proc(blocks: [SSA_B]):
-    for b in blocks:
-        if b.first_in_proc:
-            return b
+    #for b in blocks:
+    #    if b.first_in_proc:
+    #        return b
+    return blocks[0]
 
 
 # Custom class to mock a cfg block
@@ -860,6 +876,27 @@ def getNextClosingParenthesisIdx(text):
             opened += 1
     return -1
 
+
+def build_hirarchie_with_dom_tree(main_cfg_blocks: [SSA_B], dtree):
+    idx = 0
+    blocks = main_cfg_blocks.copy()
+    while idx < len(blocks):
+        curr_b = blocks[idx]
+        if '_' not in curr_b.label.label:
+            for id2 in dtree[int(curr_b.label.label)]:
+                for b in main_cfg_blocks:
+                    if b.label.label == str(id2):
+                        curr_b.blocks.append(b)
+            # Add loop body blocks (x_2) under their parent block
+            for b in main_cfg_blocks:
+                if '_' in b.label.label and b.label.label.split('_')[0] == curr_b.label.label:
+                    curr_b.blocks.append(b)
+            for b in curr_b.blocks:
+                main_cfg_blocks.remove(b)
+        idx += 1
+    return main_cfg_blocks
+
+
 def PY_to_SSA_AST(code_str: str, debug: bool):
     global ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict, used_var_names, debug_mode, original_code_lines
 
@@ -885,10 +922,9 @@ def PY_to_SSA_AST(code_str: str, debug: bool):
     ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names)
     # Parse the main CFG
 
-    DF = m_ssa.compute_DF(cfg.get_all_blocks())
-
+    dtree = m_ssa.compute_DTree(cfg.get_all_blocks())
     main_cfg_blocks = PS_BS(ProvInfo(), cfg.get_all_blocks())
-    main_cfg_blocks = sort_SSA_blocks(main_cfg_blocks, DF)
+    main_cfg_blocks = build_hirarchie_with_dom_tree(main_cfg_blocks, dtree)
     # Update global tracking variables of used variable names etc for main CFG
     update_used_vars(ssa_results_stored, const_dict)
     prov_info.parent_vars.update(get_used_vars(ssa_results_stored, const_dict))
@@ -997,10 +1033,9 @@ def PS_FS(prov_info, function_cfgs, function_args, m_ssa, parent_fun_name=None):
         # Compute the phi nodes of the current function CFG
         ssa_results_stored, ssa_results_loads, ssa_results_phi_stored, ssa_results_phi_loads, const_dict = m_ssa.compute_SSA2(cfg, used_var_names, prov_info.parent_vars, function_vars=[arg.arg for arg in args])
 
-        DF = m_ssa.compute_DF(cfg.get_all_blocks())
-
+        dtree = m_ssa.compute_DTree(cfg.get_all_blocks())
         parsed_blocks = PS_BS(prov_info, cfg.get_all_blocks())
-        parsed_blocks = sort_SSA_blocks(parsed_blocks, DF)
+        parsed_blocks = build_hirarchie_with_dom_tree(parsed_blocks, dtree)
         if parent_fun_name is not None:
             parsed_blocks[0].terms = [SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-WithinFun-' + parent_fun_name)] + parsed_blocks[0].terms
         fun_proc = SSA_P(SSA_V_VAR(f_name, pos_info=Position(cfg.ast_node)), ssa_args, parsed_blocks, pos_info=Position(cfg.ast_node))
@@ -1063,7 +1098,7 @@ def PS_B(prov_info, block, first_in_proc):
 
         # Create a new SSA Block
         block_ref.pos_info = Position(stmts)
-        b = SSA_B(block_ref, stmts, first_in_proc, pos_info=Position(stmts))
+        b = SSA_B(block_ref, stmts, [], first_in_proc, pos_info=Position(stmts))
 
         return [b]
 
@@ -1101,7 +1136,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     stmts.insert(0, SSA_E_COMM(NEW_COMMENT_MARKER + ' SSA-FOR'))
     pos_info = Position(stmts)
     block_ref.pos_info = pos_info
-    b = SSA_B(block_ref, stmts, first_in_proc, pos_info=pos_info)
+    b = SSA_B(block_ref, stmts, [], first_in_proc, pos_info=pos_info)
 
     stmts2 = []
     next_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
@@ -1119,7 +1154,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     ret_block = replace_and_find_returning_loop_block([], block, block, CFGBlockMock(new_block_name, block.exits))
     # block.exits[0].target.exits[len(block.exits[0].target.exits) - 1].target = CFGBlockMock(new_block_name, block.exits)
     addon_statements_per_block[ret_block] = [SSA_E_ASS(old_iter_var2, SSA_E_FUNC_CALL(SSA_V_VAR('next'), [SSA_V_VAR(iter_var)]))]
-    b2 = SSA_B(SSA_L(new_block_name, pos_info=pos_info), stmts2, first_in_proc, pos_info=pos_info)
+    b2 = SSA_B(SSA_L(new_block_name, pos_info=pos_info), stmts2, [], first_in_proc, pos_info=pos_info)
 
     return [b, b2]
 

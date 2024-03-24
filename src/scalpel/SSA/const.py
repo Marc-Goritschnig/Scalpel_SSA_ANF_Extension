@@ -646,9 +646,11 @@ class SSA:
         G.add_edge(0, entry_block.id)
         idom = nx.immediate_dominators(G, 0)
 
-        df = {u: set() for u in idom}
-        for u in idom:
-            pass
+        dtree = {u: [] for u in idom}
+        for k,v in idom.items():
+            dtree[v].append(k)
 
-        return None
+        for k,v in dtree.items():
+            v.reverse()
+        return dtree
 

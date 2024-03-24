@@ -143,7 +143,9 @@ class ANFNode:
 
     def print_prov_ext(self):
         prov = ''
-        if not no_pos_tracking and self.pos_info is not None:
+        if no_pos_tracking:
+            pass
+        elif not no_pos_tracking and self.pos_info is not None:
             prov += PROV_INFO_EXT_CHAR + str(self.pos_info)
         else:
             prov += PROV_INFO_EXT_CHAR
@@ -257,8 +259,9 @@ class ANF_E_LET(ANF_E):
         self.term2: ANF_E = term2
 
     def print(self, lvl = 0, prov_info: str = ''):
-        next_lvl = lvl #+ 1
-        #if isinstance(self.term2, ANF_E_LET) or isinstance(self.term2, ANF_E_COMM):
+        next_lvl = lvl
+        #next_lvl = lvl + 1
+        #if isinstance(self.term2, ANF_E_LET) or isinstance(self.term2, ANF_E_IF) or isinstance(self.term2, ANF_E_COMM):
         #    next_lvl = lvl
         return get_indentation(lvl) + f"let {self.var.print(next_lvl)} = {self.term1.print(0)} in \n{self.term2.print(next_lvl)}"
 
@@ -281,36 +284,52 @@ class ANF_E_LET(ANF_E):
         return out
 
 class ANF_E_LETREC(ANF_E):
-    def __init__(self, var: ANF_V, term1: ANF_EV, term2: ANF_E, ssa_node: SSANode = None):
+    def __init__(self, terms: [ANF_EV], term2: ANF_E, ssa_node: SSANode = None):
+        super().__init__(ssa_node=ssa_node)
+        self.terms: [ANF_EV] = terms
+        self.term2: ANF_EV = term2
+
+    def print(self, lvl=0, prov_info: str = ''):
+        add_newline = '' if len(self.terms) == 0 else '\n'
+        return get_indentation(lvl) + 'letrec \n' + ('').join(letrec.print(lvl + 1) for letrec in self.terms) + (get_indentation(lvl) + 'in\n' + (self.term2.print(lvl + 1))) if self.term2 is not None else ''
+
+    def get_prov_info(self, prov_info):
+        add_newline = '' if len(self.terms) == 0 else '\n'
+        return '\n' + ''.join([term.get_prov_info(None) for term in self.terms]) + '\n' + self.term2.get_prov_info(None)
+
+    def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
+        out = '\n'.join(t for t in [term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) for term in self.terms] if len(t) > 0)
+        if self.term2 is not None:
+            if isinstance(self.term2, ANF_E_FUNC):
+                out += get_next_non_function_term(self.term2).parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            else:
+                out += self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        return post_processing_anf_to_python(out)
+
+class ANF_E_LETREC_ASS(ANF_E):
+    def __init__(self, var: ANF_V, term1: ANF_EV, ssa_node: SSANode = None):
         super().__init__(ssa_node=ssa_node)
         self.var: ANF_V = var
         self.term1: ANF_EV = term1
-        self.term2: ANF_E = term2
 
     def print(self, lvl=0, prov_info: str = ''):
-        # assignments = ('\n' + get_indentation(lvl + 1)).join(v.print(lvl + 2) + ' = ' + t.print(lvl+2) for v, t in zip(self.var, self.term1))
-        add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
-        line_sep = '\n' if add_new_line else ''
-        line_sep2 = '\n' + get_indentation(lvl)
-        return get_indentation(lvl) + 'letrec ' + self.var.print(lvl + 1) + ' = ' + line_sep + self.term1.print(lvl + 1) + line_sep2 + 'in\n' + self.term2.print(lvl + 1)
+        line_sep = '\n'
+        return get_indentation(lvl) + self.var.print(lvl + 1) + ' = ' + line_sep + self.term1.print(lvl + 1) + line_sep
 
     def get_prov_info(self, prov_info):
-        add_new_line = isinstance(self.term1, ANF_E_LETREC) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
-        line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
+        add_new_line = isinstance(self.term1, ANF_E_LETREC_ASS) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
         line_sep2 = '\n'
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + line_sep + self.term1.get_prov_info(None) + line_sep2 + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
+        return self.var.get_prov_info(None) + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + '\n' + self.term1.get_prov_info(None) + line_sep2
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if self.var.is_block_id:
             t1 = get_next_non_function_term(self.term1)
             assignments[self.var.name] = t1
-            out = self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-            return post_processing_anf_to_python(out)
+            return ''
 
         vars = get_function_parameter_recursive(self.term1)
         next_term = get_next_non_function_term(self.term1)
-        newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
-        out = get_indentation(lvl) + 'def ' + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1) + newline + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        out = get_indentation(lvl) + 'def ' + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1)
         return post_processing_anf_to_python(out)
 
 def get_function_parameter_recursive(next):
@@ -501,7 +520,11 @@ class ANF_E_FUNC(ANF_E):
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         # Not used_var_names
         # letrecs of parsed functions do not call print on this type only read its variables and innermost term
-        return None
+        return ''
+
+
+def print_anf_code_to_python(anf_tree: ANFNode):
+    return post_processing_anf_to_python(anf_tree.parse_anf_to_python({}, [], []))
 
 
 def get_first_node_diff_than_comment(node):
@@ -536,21 +559,22 @@ def SA(ssa_ast: SSA_AST):
 
     # Transform all procedures of the SSA AST and put the call of the first block as inner most term
     first_block = get_first_block_in_proc(ssa_ast.blocks)
-    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + str(first_block.label.label), is_block_id=True), ssa_node=first_block), True))
+    return SA_PS(ssa_ast.procs, SA_BS(ssa_ast.blocks[0], True, first_scope=True))
 
 
 # Transforms a list of procedures putting the inner_term inside the innermost let/rec
-def SA_PS(ps: [SSA_P], inner_term):
+def SA_PS(ps: [SSA_P], inner_term, as_array: bool = False):
     # When there is no procedure we return the inner term
     if len(ps) == 0:
         return inner_term
 
     # If we have the last procedure we return a letrec of this proc using the inner term
-    p: SSA_P = ps[0]
 
-    if len(ps) == 1:
-        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label, is_block_id=True)), True)
+    parsed_procs = []
+    while len(ps) > 0:
+        p: SSA_P = ps[0]
 
+        first_term = SA_BS(p.blocks[0], True, first_scope=True)
         # args = p.args[::-1] If arguments should be given in backwards order
         # If so the back transformation function get_function_parameter_recursive must also be build in revers
         args = p.args
@@ -560,56 +584,63 @@ def SA_PS(ps: [SSA_P], inner_term):
 
         v = SA_V(p.name)
         v.init(ssa_node=p)
-        let_rec = ANF_E_LETREC(v, first_term, inner_term, ssa_node=p)
-    # If we have still more than one procedure we return a letrec of this proc using a recursive call to build the other procs as inner term
-    else:
-        first_term = SA_BS(p.blocks, ANF_E_APP([], ANF_V_CONST(block_identifier + get_first_block_in_proc(p.blocks).label.label, is_block_id=True)), True)
+        ps = ps[1:]
+        parsed_procs.append(ANF_E_LETREC_ASS(v, first_term, ssa_node=p))
 
-        args = p.args
-        while len(args) > 0:
-            first_term = ANF_E_FUNC(SA_V(args[0]), first_term, ssa_node=p)
-            args = args[1:]
-
-        v = SA_V(p.name)
-        v.init(ssa_node=p)
-        let_rec = ANF_E_LETREC(v, first_term, SA_PS(ps[1:], inner_term), ssa_node=p)
+    let_rec = ANF_E_LETREC(parsed_procs, inner_term, ssa_node=p)
 
     return let_rec
 
 
 # Transform a list of SSA blocks
-def SA_BS(bs: [SSA_B], inner_call, first_block=False):
-    if len(bs) == 0:
-        return inner_call
-    b: SSA_B = bs[0]
+def SA_BS(b: SSA_B, is_block_id=True, first_scope=False):
     block_vars = [SA_V(phi_var) for phi_var in get_phi_vars_in_block(b)]
-
 
     # Create self containing functions to build lambda functions in each other. leading to have functions with multiple variables
     if len(block_vars) > 0:
-        func = ANF_E_FUNC(block_vars[0], SA_ES(b, b.terms), ssa_node=b)
+        b_terms = ANF_E_FUNC(block_vars[0], SA_ES(b, b.terms), ssa_node=b)
         block_vars = block_vars[1:]
 
         while len(block_vars) > 0:
-            func = ANF_E_FUNC(block_vars[0], func, ssa_node=b)
+            b_terms = ANF_E_FUNC(block_vars[0], b_terms, ssa_node=b)
             block_vars = block_vars[1:]
     else:
-        func = SA_ES(b, b.terms)
+        b_terms = SA_ES(b, b.terms)
 
-    if first_block:
-        inner_call, func = func, inner_call
+    let_rec = []
+    if b.blocks is not None and len(b.blocks) > 0:
+        let_rec = SA_BS2(b.blocks)
 
-    if len(bs) == 1:
-        in_block = inner_call
-    else:
-        in_block = SA_BS(bs[1:], inner_call)
+    if b.blocks is None or len(b.blocks) == 0:
+        return b_terms
 
-    if first_block:
-        in_block, func = func, in_block
+    if first_scope:
+        return ANF_E_LETREC(let_rec, b_terms)
+    return ANF_E_LETREC_ASS(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), ANF_E_LETREC(let_rec, b_terms))
 
-    let_rec = ANF_E_LETREC(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), func, in_block, ssa_node=b)
 
-    return let_rec
+def SA_BS2(bs: [SSA_B], is_block_id=True):
+    blocks_out = []
+
+    for b in bs:
+        if b.blocks is not None and len(b.blocks) > 0:
+            blocks_out.append(SA_BS(b))
+        else:
+            block_vars = [SA_V(phi_var) for phi_var in get_phi_vars_in_block(b)]
+
+            # Create self containing functions to build lambda functions in each other. leading to have functions with multiple variables
+            if len(block_vars) > 0:
+                b_terms = ANF_E_FUNC(block_vars[0], SA_ES(b, b.terms), ssa_node=b)
+                block_vars = block_vars[1:]
+
+                while len(block_vars) > 0:
+                    b_terms = ANF_E_FUNC(block_vars[0], b_terms, ssa_node=b)
+                    block_vars = block_vars[1:]
+            else:
+                b_terms = SA_ES(b, b.terms)
+
+            blocks_out.append(ANF_E_LETREC_ASS(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), b_terms, ssa_node=b))
+    return blocks_out
 
 
 def SA_ES(b: SSA_B, terms: [SSA_E]):
@@ -731,6 +762,7 @@ def parse_anf_from_text(code: str):
 # Convert an ANF code expression to ANF AST
 def parse_anf_e_from_code(code_words, info_words):
     next_word = code_words[0]
+    info0_parts = info_words[0].split(PROV_INFO_EXT_CHAR)
     if len(info_words) > 1:
         info1_parts = info_words[1].split(PROV_INFO_EXT_CHAR)
 
@@ -743,10 +775,38 @@ def parse_anf_e_from_code(code_words, info_words):
         _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LET(variable, right, _in)
     if next_word == 'letrec':
-        variable = ANF_V_VAR(code_words[1], info1_parts[0] == 'bv', is_block_id=info1_parts[0] == 'lc' or info1_parts[0] == 'lv')
-        right = parse_anf_e_from_code(code_words[3:], info_words[3:])
+        i = 0
+        blocks = []
+        in_idx = get_other_section_part_idx(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
+        inside = 0
+        while len(code_words) > i+2 and i < in_idx:
+            if code_words[i] == 'let' or (code_words[i] == 'letrec' and i > 0):
+                inside += 1
+            elif code_words[i] == 'in':
+                inside -= 1
+            elif inside == 0 and code_words[i] != 'let' and code_words[i+2] == '=':
+                #Find start of next assignment or end at the 'in' area
+                i2 = i + 1
+                inside2 = 0
+                while len(code_words) > i2+2 and i2 < in_idx + 1:
+                    if code_words[i2] == 'let' or code_words[i2] == 'letrec':
+                        inside2 += 1
+                    elif code_words[i2] == 'in':
+                        inside2 -= 1
+                    elif inside2 == 0 and 'let' not in code_words[i2] and code_words[i2 + 2] == '=':
+                        i2 += 1
+                        break
+                    i2 += 1
+                block = parse_anf_e_from_code(code_words[i+1:i2], info_words[i+1:i2])
+                blocks.append(block)
+            i += 1
         _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
-        return ANF_E_LETREC(variable, right, _in)
+        return ANF_E_LETREC(blocks, _in)
+    if len(code_words) > 1 and code_words[1] == '=':
+        # assign within letrec
+        variable = ANF_V_VAR(code_words[0], info0_parts[0] == 'bv', is_block_id=info0_parts[0] == 'lc' or info0_parts[0] == 'lv')
+        right = parse_anf_e_from_code(code_words[2:], info_words[2:])
+        return ANF_E_LETREC_ASS(variable, right)
     if next_word == 'unit':
         return ANF_V_UNIT()
     if next_word == 'lambda' or next_word == 'λ':
@@ -767,6 +827,8 @@ def parse_anf_e_from_code(code_words, info_words):
     while count + 1 < len(code_words) and next_word not in keywords:
         count += 1
         next_word = code_words[count]
+    if count + 1 == len(code_words) and next_word not in keywords:
+        count += 1
 
     if count > 1:
         # Read param naming prov info
@@ -810,13 +872,18 @@ def parse_anf_v_from_code(code_word: str, info_word_with_prov: str):
             n.prov_info = ''
     return n
 
+
 # Get the position of the next part belonging to the given one
 # Ex. We start at a "letrec" and want to find its "in"
 # (letrec) xxx let xxx let xxx in xxx in xxx (in) xxx
 def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str], close_keys: [str]):
+    idx = get_other_section_part_idx(code_words, info_words, open_keys, close_keys)
+    return parse_anf_e_from_code(code_words[idx + 1:], info_words[idx + 1:])
+
+
+def get_other_section_part_idx(code_words: [str], info_words: [str], open_keys: [str], close_keys: [str]):
     indentation = 1
     idx = 0
-    comment_offset = 0
     for i, w in enumerate(code_words):
         if w in open_keys:
             indentation += 1
@@ -826,7 +893,7 @@ def get_other_section_part(code_words: [str], info_words: [str], open_keys: [str
             idx = i
             break
 
-    return parse_anf_e_from_code(code_words[idx + 1:], info_words[idx + 1 + comment_offset:])
+    return idx
 
 
 def get_name_from_buffer(name):
@@ -855,31 +922,31 @@ def post_processing_anf_to_python(code):
             fun_name = lines[i].replace(ORIGINAL_COMMENT_MARKER + ' SSA-WithinFun-', '').strip()
             fun_end_idx = 0
             j = 2
+            # Find start of target function
             while not re.match(r'^ *def ' + fun_name + '.*', lines[i + j]):
                 j += 1
                 if i + j >= len(lines):
                     break
                 line_indentation = len(re.findall(r"^ *", lines[i + j])[0])
+                # Save end of current function to be moved
                 if line_indentation == 0 and fun_end_idx == 0:
-                    fun_end_idx = i + j - 1
+                    fun_end_idx = i + j
 
             if i + j < len(lines):
                 indentation = len(re.findall(r"^ *", lines[i + j])[0])
 
                 j2 = 1
-                #while len(re.findall(r"^ *", lines[i + j + j2])[0]) > indentation and not re.match(r'^ *def ', lines[i + j + j2]):
-                #    j2 += 1
-                #    if i + j + j2 >= len(lines):
-                #        break
+                if re.match(r'^\s*' + ORIGINAL_COMMENT_MARKER + ' SSA-WithinFun', lines[i + j + j2]):
+                    j2 += 1
+
                 if i + j + j2 < len(lines):
                     target_indentation = indentation + 4
                     if fun_end_idx == 0:
                         lines = lines[i + j:i+j+j2] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+j-1]] + lines[i+j+j2:]
                     else:
-                        lines = lines[i + fun_end_idx:i+j+j2] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+fun_end_idx-1]] + lines[i+j+j2:]
-                    x = '\n'.join(lines)
-                    y = '\n'.join(output.split('\n')[:-2])
-                    return '\n'.join(output.split('\n')[:-2]) + post_processing_anf_to_python('\n'.join(lines))
+                        lines = lines[fun_end_idx:i+j+j2] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:fun_end_idx]] + lines[i+j+j2:]
+                    out = '\n'.join(output.split('\n')[:-2]) + post_processing_anf_to_python('\n'.join(lines))
+                    return out
                 else:
                     output += line + '\n'
             else:
@@ -979,17 +1046,19 @@ def post_processing_anf_to_python(code):
             output += lines[i + j + 1].replace(variable, out)
             skip = j + 1
         elif ORIGINAL_COMMENT_MARKER + ' SSA-Lambda' in line and 'def ' in lines[i - 1]:
-            name, args = re.sub(r'def (.*)\((.*)\).*', r'\1;\2', lines[i - 1]).split(';')
-            code = lines[i + 1]
-            output = ''.join(output.split('\n')[:-2])
-            lines[i - 1] = ''
-            lines[i] = ''
-            lines[i + 1] = ''
-            j = 2
-            while i + j < len(lines):
-                lines[i + j] = re.sub(name + '([^\w_0-9]+|$)+', 'lambda ' + args + ': ' + code, lines[i + j])
-                j += 1
-            skip = 1
+            if len(lines) > i + 3 or len(lines) > i + 2 and lines[i + 2] != '':
+                name, args = re.sub(r'def (.*)\((.*)\).*', r'\1;\2', lines[i - 1]).split(';')
+                code = lines[i + 1]
+                output = ''.join(output.split('\n')[:-2])
+                lines[i - 1] = ''
+                lines[i] = ''
+                lines[i + 1] = ''
+                j = 2
+                while i + j < len(lines):
+                    lines[i + j] = re.sub(name + '([^\w_0-9]+|$)+', 'lambda ' + args + ': ' + code, lines[i + j])
+                    j += 1
+                skip = 1
+            output += lines[i] + '\n'
         elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptSet'):
             indentation, var, subscript, value = re.sub(r'^( *)(.*) = .*\((.*),(.*),(.*)\).*', r'\1;\2;\4;\5', lines[i + 1]).split(';')
             output += indentation + var + '[' + subscript + '] = ' + value + '\n'
@@ -1054,7 +1123,7 @@ def post_processing_anf_to_python(code):
                 lines[i + 2] = lines[i + 2].replace(var + '.' + attr, var + '.' + attr + '(' + params + ')')
             return output + post_processing_anf_to_python('\n'.join(lines[i + 2:]))
         else:
-            output += line + '\n'
+            output += line + ('' if (i == len(lines) - 1 and line == '') else '\n')
     return output
 
 def extract_main_parenthesis(input):

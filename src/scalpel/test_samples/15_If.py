@@ -1,6 +1,6 @@
 a = 1
 if a == 1:
-    a = 2
+    a = 8
 else:
-    a = 3
+    a = 9
 print(a)
