@@ -1021,11 +1021,11 @@ def post_processing_anf_to_python(code):
         elif '_str_format' in line_strip:
             v3 = None
             if '_str_format2' in line_strip:
-                start, content = line_strip.split('_str_format2')
+                start, content = line_strip.split('_str_format2', 1)
                 _, content, end = extract_main_parenthesis(content)
                 v1, v2 = re.sub(r'\(*(.*),(.*)\)*', r'\1;\2', content).split(';')
             else:
-                start, content = line_strip.split('_str_format3')
+                start, content = line_strip.split('_str_format3', 1)
                 _, content, end = extract_main_parenthesis(content)
                 v1, v2, v3 = re.sub(r'\(*(.*),(.*[^\(\)]),(.*[^\(\)])\)*', r'\1;\2;\3', content).split(';')
 
