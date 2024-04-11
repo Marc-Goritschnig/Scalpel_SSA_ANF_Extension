@@ -13,7 +13,7 @@ test4.py...https://github.com/gregmuellegger/django-autofixture/blob/master/runt
 test5.py...https://github.com/emanuele/kaggle_pbr/blob/master/blend.py  
 - No - (Subscript on left side of assignment)
 
-test6.py...https://github.com/Kong/unirest-python/blob/master/unirest/utils.py  
+test6.py...https://github.com/Kong/unirest-python/blob/master/unirest/utils.py
 - Yes - (parenthesis, fun position)
 
 test7.py...https://github.com/Asabeneh/30-Days-Of-Python/blob/master/03_Day_Operators/day-3.py
@@ -57,4 +57,3 @@ test19.py...https://github.com/RMerl/asuswrt-merlin.ng/blob/bc3c8c32858492818c2b
 
 test20.py...https://github.com/RMerl/asuswrt-merlin.ng/blob/bc3c8c32858492818c2be50e2ea95522bd342f5e/release/src/router/samba-3.6.x_opwrt/source/lib/dnspython/dns/flags.py#L82
 - Yes - (function position, parenthesis, new lines, integers made from hex, ' instead of """)
-
