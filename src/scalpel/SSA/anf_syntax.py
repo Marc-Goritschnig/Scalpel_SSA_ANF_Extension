@@ -375,7 +375,7 @@ class ANF_E_IF(ANF_E):
         goto1 = if_block_label.split('\n')[-1].strip().split('(')[0][1:]
         goto2 = else_block_label.split('\n')[-1].strip().split('(')[0][1:]
 
-        pattern = r'( )*continue\n( )*L[0-9]\(\)'
+        pattern = r'( )*continue\n( )*L[0-9]+\(.*\)'
         is_if_with_only_continue_in_body = re.match(pattern, if_out) is not None
         # If the labels of gotos are i and i+1 it shows as the pattern which is generated when parsing a while loop
         # Otherwise it would be i and i+2 because the block i+1 would be after the if-else block
@@ -1199,9 +1199,10 @@ def split_at_comma(string):
     result = []
     current_part = ''
     braces_count = 0
+    ap_count = 0
 
     for char in string:
-        if char == ',' and braces_count == 0:
+        if char == ',' and braces_count == 0 and ap_count == 0:
             result.append(current_part.strip())
             current_part = ''
         else:
@@ -1210,6 +1211,10 @@ def split_at_comma(string):
                 braces_count += 1
             elif char == ')' or char == ']':
                 braces_count -= 1
+            if char == '\'' and ap_count % 2 == 0:
+                ap_count += 1
+            elif char == '\'' and ap_count % 2 == 1:
+                ap_count -= 1
 
     if current_part:
         result.append(current_part.strip())
