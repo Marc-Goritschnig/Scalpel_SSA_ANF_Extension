@@ -8,15 +8,13 @@ from scalpel import ast_comments as ast
 from scalpel.core.mnode import MNode
 from scalpel.SSA.const import SSA
 from scalpel.functions import get_global_unique_name, get_global_unique_name_with_update, replaceSpaces
-from scalpel.config import ORIGINAL_COMMENT_MARKER, NEW_COMMENT_MARKER
+from scalpel.config import ORIGINAL_COMMENT_MARKER, NEW_COMMENT_MARKER, SSA_BUFFER_VAR_NAME, BLOCK_IDENTIFIER
 
 debug_mode = True
 font = {'assign': '←',
         'phi': 'φ'}
 
-block_identifier = 'L'
 
-buffer_var_name = '_SSA_'
 
 operator_map = {
     ast.Add: '+',
@@ -357,14 +355,14 @@ class SSA_B(SSANode):
         if self.blocks is not None and len(self.blocks) > 0:
             blocks_pre = '{'
             blocks = ''.join([b.print(lvl+1) for b in self.blocks]) + '\n' + get_indentation(lvl) + '}'
-        return get_indentation(lvl) + f"{block_identifier + self.label.print(lvl+1) + ': '+ blocks_pre  + new_line + print_terms(self.terms, lvl+1) + new_line + new_line + blocks }"
+        return get_indentation(lvl) + f"{BLOCK_IDENTIFIER + self.label.print(lvl+1) + ': '+ blocks_pre  + new_line + print_terms(self.terms, lvl+1) + new_line + new_line + blocks }"
 
     def print_latex(self, lvl):
         return ""
 
     def parse_to_python(self, lvl):
         new_line = '\n'
-        return get_indentation(lvl) + f"{block_identifier + self.label.parse_to_python(lvl+1) + ': ' + new_line + print_terms_to_python(self.terms, lvl+1)}"
+        return get_indentation(lvl) + f"{BLOCK_IDENTIFIER + self.label.parse_to_python(lvl+1) + ': ' + new_line + print_terms_to_python(self.terms, lvl+1)}"
 
 
 class SSA_P(SSANode):
@@ -561,10 +559,49 @@ def replace_code_with_content(lines, line_from, line_to, col_from, col_to, conte
 def get_tab():
     return '   '
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 def preprocess_py_code(code):
     replaced = True
     while replaced:
+        replaced = False
+
+        # Fix code attributes in elif
+        lines = code.split('\n')
+        for i, line in enumerate(lines):
+            if re.match('^( )*elif', line) is not None:
+                indentation = len(re.findall(r"^ *", line)[0])
+                j = i - 1
+                moving_lines_idx = []
+                while j >= 0:
+                    indentation2 = len(re.findall(r"^ *", lines[j])[0])
+                    if indentation2 == indentation and lines[j].strip() != '':
+                        if re.match('^( )*if', lines[j]):
+                            break
+                        elif re.match('^( )*elif', lines[j]) is None:
+                            moving_lines_idx.append(j)
+                    j -= 1
+                if len(moving_lines_idx) > 0:
+                    for j2, idx in enumerate(moving_lines_idx):
+                        content = lines[idx + j2]
+                        lines[idx + j2] = ''
+                        lines.insert(j, content)
+                    replaced = True
+                if replaced:
+                    code = '\n'.join(lines)
+                    break
+        if replaced:
+            continue
+
         if debug_mode:
             print("Preprocessing code version:")
             print(code)
@@ -581,8 +618,17 @@ def preprocess_py_code(code):
         code = re.sub(pattern, replacer, code)
 
         tree = ast.parse(code)
-        replaced = False
         for node in ast.walk(tree):
+            # Check for not handled Nodes
+            if isinstance(node, ast.Subscript):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                parts = line.split(ast.unparse(node))
+                if len(parts) > 1 and '=' in parts[1]:
+                    print(bcolors.WARNING + "Warning: Subscript on left side of assignment found. This behaviour is not implemented" + bcolors.ENDC)
+            elif isinstance(node, ast.Try) or isinstance(node, ast.ExceptHandler) or isinstance(node, ast.With):
+                print(bcolors.WARNING + "Warning: " + type(node).__name__ + " found. This behaviour is not implemented" + bcolors.ENDC)
+
             if isinstance(node, ast.ClassDef):
                 lines = code.split('\n')
                 line = lines[node.lineno - 1]
@@ -602,6 +648,18 @@ def preprocess_py_code(code):
                 indentation = len(re.findall(r"^ *", line)[0])
                 lines[node.lineno - 1] = ORIGINAL_COMMENT_MARKER + ' ' + lines[node.lineno - 1]
                 lines.insert(node.lineno - 1, indentation * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-Import')
+                code = '\n'.join(lines)
+                replaced = True
+                break
+            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Subscript):
+                lines = code.split('\n')
+                line = lines[node.lineno - 1]
+                indentation = len(re.findall(r"^ *", line)[0])
+                buffer_var = get_buffer_var()
+                lines[node.lineno - 1] = line.replace(ast.unparse(node.func), buffer_var)
+                lines.insert(node.lineno - 1, indentation * ' ' + buffer_var + ' = ' + ast.unparse(node.func))
+                lines.insert(node.lineno - 1, indentation * ' ' + '# SSA-FuncSub')
+
                 code = '\n'.join(lines)
                 replaced = True
                 break
@@ -643,6 +701,22 @@ def preprocess_py_code(code):
                     replaced = True
                 break
             elif isinstance(node, ast.For):
+                # Check for tuple in iterator variables
+                if isinstance(node.target, ast.Tuple):
+                    lines = code.split('\n')
+                    line = lines[node.lineno - 1]
+                    buffer_var = get_buffer_var()
+                    indentation = len(re.findall(r"^ *", line)[0])
+                    lines[node.lineno - 1] = line.replace(ast.unparse(node.target), buffer_var, 1)
+
+                    lines.insert(node.lineno - 1, (indentation) * ' ' + ORIGINAL_COMMENT_MARKER + ' SSA-ForTuple')
+                    for i, elt in enumerate(node.target.elts):
+                        lines.insert(node.lineno + 1 + i, (indentation + 4) * ' ' + ast.unparse(elt) + ' = ' + buffer_var + '[' + str(i) + ']')
+                    code = '\n'.join(lines)
+                    replaced = True
+                    break
+
+                # Check for no single statement at the end of the body
                 _CONTAINER_ATTRS = ["body", "handlers", "orelse", "finalbody"]
                 last_node = node.body[-1]
                 for attr in _CONTAINER_ATTRS:
@@ -781,7 +855,7 @@ def preprocess_py_code(code):
                     # If value side contains just one value like a function call which will return multiple values
                     lines.insert(node.lineno, (indentation * ' ') + tuple_name + ' = ' + ast.unparse(node.value))
                 for idx, var in enumerate(node.targets[0].elts):
-                    lines.insert(node.lineno + idx + 1, (indentation * ' ') + var.id + ' = ' + '_Tuple_Get(' + tuple_name + ', ' + str(idx) + ')')
+                    lines.insert(node.lineno + idx + 1, (indentation * ' ') + ast.unparse(var) + ' = ' + '_Tuple_Get(' + tuple_name + ', ' + str(idx) + ')')
 
                 code = '\n'.join(lines)
                 replaced = True
@@ -789,8 +863,10 @@ def preprocess_py_code(code):
             elif isinstance(node, ast.Subscript):
 
                 original = ast.unparse(node)
-                if ',' in original:
-                    changed = original.replace(',', '][')
+                o_parts = original.rsplit('[')
+                o_parts[0] += '['
+                if ',' in o_parts[1]:
+                    changed = o_parts[0] + o_parts[1].replace(',', '][')
                     lines = code.split('\n')
                     line = lines[node.lineno - 1]
                     indentation = len(re.findall(r"^ *", line)[0])
@@ -806,7 +882,9 @@ def preprocess_py_code(code):
                 line = lines[node.lineno - 1]
 
                 indentation = len(re.findall(r"^ *", line)[0])
-                if isinstance(node.targets[0].value, ast.Attribute):
+                if isinstance(node.targets[0].value, ast.Subscript):
+                    continue
+                elif isinstance(node.targets[0].value, ast.Attribute):
                     var = ast.unparse(node.targets[0].value)
                 else:
                     var = node.targets[0].value.id
@@ -845,11 +923,11 @@ def preprocess_py_code(code):
                 if lines[node.lineno - 1][node.end_col_offset:].startswith('('):
                     closingIdx = getNextClosingParenthesisIdx(lines[node.lineno - 1][node.end_col_offset+1:])
                     params = lines[node.lineno - 1][node.end_col_offset+1:node.end_col_offset+1+closingIdx]
-                    lines[node.lineno - 1] = line.replace(var + '.' + attr + '(' + params + ')', buffer_var)
+                    lines[node.lineno - 1] = line.replace(var + '.' + attr + '(' + params + ')', buffer_var, 1)
                     params = ', ' + params if len(params) > 0 else ''
                     fun_name = '_obj2_'
                 else:
-                    lines[node.lineno - 1] = line.replace(var + '.' + attr, buffer_var)
+                    lines[node.lineno - 1] = line.replace(var + '.' + attr, buffer_var, 1)
 
                 #if lines[node.lineno - 1].strip() == buffer_var:
                 #    lines[node.lineno - 1] = ''
@@ -1107,7 +1185,7 @@ def PS_B(prov_info, block, first_in_proc):
 def get_buffer_var():
     global buffer_counter
     buffer_counter = buffer_counter + 1
-    return buffer_var_name + str(buffer_counter - 1)
+    return SSA_BUFFER_VAR_NAME + str(buffer_counter - 1)
 
 
 def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
@@ -1115,7 +1193,9 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     new_block_name = block_ref.label + '_2'
 
     stmts = []
-    iter_var = get_buffer_var()
+    iter_var = get_buffer_var() + '_0'
+    if isinstance(stmt.iter, ast.Name) and stmt.iter.id.startswith(SSA_BUFFER_VAR_NAME):
+        stmt.iter.id += '_0'
     stmts.append(SSA_E_ASS(SSA_V_VAR(iter_var), PS_E(prov_info, block, stmt.iter, 0, False)))
 
     old_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
@@ -1212,9 +1292,11 @@ def PS_S(prov_info, curr_block, stmt, st_nr):
         return [SSA_E_ASS(variable, PS_E(prov_info, curr_block, stmt.value, st_nr, True), pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Raise):
         if stmt.cause is not None:
-            return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise_2', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])] +
+            return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise_2', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(PS_E(prov_info, curr_block, stmt.exc.func, st_nr, True), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])] +
                                     [PS_E(prov_info, curr_block, stmt.cause, st_nr, False)], pos_info=Position(stmt))]
-        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(SSA_V_VAR(stmt.exc.func.id), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])], pos_info=Position(stmt))]
+        if hasattr(stmt.exc, 'func'):
+            return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise', pos_info=Position(stmt)), [SSA_E_FUNC_CALL(PS_E(prov_info, curr_block, stmt.exc.func, st_nr, True), [PS_E(prov_info, curr_block, arg, st_nr, False) for arg in stmt.exc.args])], pos_info=Position(stmt))]
+        return [SSA_E_FUNC_CALL(SSA_V_VAR('_Raise', pos_info=Position(stmt)), [PS_E(prov_info, curr_block, stmt.exc, st_nr, True)], pos_info=Position(stmt))]
     elif isinstance(stmt, ast.Assert):
         args = [PS_E(prov_info, curr_block, stmt.test, st_nr, False)]
         name = '_Assert'
@@ -1274,7 +1356,7 @@ def PS_E(prov_info, curr_block, stmt, st_nr, is_load):
         return PS_MAP2(prov_info, curr_block, PS_E(prov_info, curr_block, stmt.left, st_nr, is_load), stmt.ops, stmt.comparators, st_nr)
     elif isinstance(stmt, ast.Constant):
         if isinstance(stmt.value, str):
-            return SSA_V_CONST("'" + stmt.value.replace('\n', '\\n') + "'", pos_info=Position(stmt))
+            return SSA_V_CONST("'" + stmt.value.replace('\n', '\\n').replace('\'', '\\\'') + "'", pos_info=Position(stmt))
         else:
             return SSA_V_CONST(stmt.value, pos_info=Position(stmt))
     elif isinstance(stmt, ast.Slice):

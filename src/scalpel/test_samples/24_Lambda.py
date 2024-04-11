@@ -1,2 +1,1 @@
-x = lambda a: a + 10
-print(x(5))
+planets = map(lambda x: x[0], grouped)

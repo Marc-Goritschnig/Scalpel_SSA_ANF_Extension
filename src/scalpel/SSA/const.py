@@ -348,10 +348,11 @@ class SSA:
             found = False
             pred = pred.source
             highest_nr = -1
-            for var_dict in block_renamed_stored[pred.id] + block_renamed_phi_stored[pred.id]:
-                for var in var_dict.keys():
-                    if var == var_searched:
-                        highest_nr = var_dict[var]
+            if pred.id in block_renamed_stored and pred.id in block_renamed_phi_stored:
+                for var_dict in block_renamed_stored[pred.id] + block_renamed_phi_stored[pred.id]:
+                    for var in var_dict.keys():
+                        if var == var_searched:
+                            highest_nr = var_dict[var]
 
             if highest_nr >= 0: # found an entry
                 nrs.append(highest_nr)

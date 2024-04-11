@@ -6,6 +6,6 @@ for a in range(2):
             print(c)
     print(c)
 print('a')
-for j, clf in enumerate(clfs):
-    for i, (train, test) in enumerate(skf):
-        print("Fold", i)
+for (j, clf) in enumerate(clfs):
+    for (i, (train, test)) in enumerate(skf):
+        print('Fold', i)

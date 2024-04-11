@@ -61,7 +61,7 @@ export class AppComponent {
     let codeElement = document.getElementById('code');
 
     if (codeElement) {
-      if (w.pos.lineno === 0) {
+      if (!w.pos || w.pos.lineno === 0) {
         codeElement.innerHTML = this.pyCode;
       } else {
 
@@ -153,7 +153,9 @@ export class AppComponent {
     for (const line of this.anfCodeLines) {
 
       if (line.match('^( )*#.*')){
-        let parts = line.split('--');
+        const ps = line.split('--');
+        ps.pop();
+        let parts = [ps.join('--').trimEnd(), ''];
         this.wordCollection.push([new Word(parts[0], new Position(parts[1].split(';')[1]))]);
         continue;
       }

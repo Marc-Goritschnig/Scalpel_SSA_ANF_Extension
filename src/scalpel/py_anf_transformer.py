@@ -57,7 +57,7 @@ def transform():
 
     # Read python code from input file given
     if python_code_path is not None:
-        with open(python_code_path, 'r') as file:
+        with open(python_code_path, 'r', encoding="utf8") as file:
             py_code = file.read()
 
     if only_parse_back:
@@ -139,7 +139,7 @@ def transform():
             # print('\n\n\n')
             # print('\n\n\n')
 
-        # print(anf_to_python)
+        #print(anf_to_python)
         x = ast.parse(anf_to_python)
         # print(ast.unparse(x))
         print(add_missing_blank_lines(ast.unparse(x)).rstrip())
