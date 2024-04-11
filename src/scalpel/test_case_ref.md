@@ -29,7 +29,7 @@ test10.py...https://github.com/TheAlgorithms/Python/blob/c6ca1942e14a6e88c7ea1b9
 - Yes - (typehints are removed, ' statt ", inlined comments in nachstehender Zeile, fun position)
 
 test11.py...https://github.com/sourabhvora/HyperFace-with-SqueezeNet/blob/master/hyperface.py
-- No TODO
+- Yes - (new lines, ' statt ", spaces)
 
 test12.py...https://github.com/openwall/john/blob/f55f42067431c0e8f67e600768cd8a3ad8439818/run/dns/tsigkeyring.py#L25
 - Yes - 'text' instead of """text"""
@@ -43,8 +43,8 @@ test14.py...https://github.com/Tautulli/Tautulli/blob/d019efcf911b4806618761c2da
 test15.py...https://github.com/RMerl/asuswrt-merlin.ng/blob/bc3c8c32858492818c2be50e2ea95522bd342f5e/release/src/router/samba-3.6.x_opwrt/source/lib/dnspython/dns/opcode.py#L45
 - Yes - (parenthesis, new lines, ' """, function order)
 
-test16.py...https://github.com/zhonghe0615/python-sdk/blob/4dbc3d3ab608c8e1d78cb5960d1ae0e55b2502b2/client/datatype_parser.py#L47
--  No TODO
+test16.py...https://github.com/hemathulsidhos/Download-and-Extract-Structural-Metadata-from-Islandora/blob/main/download_rels_ext_2.0.py
+- Yes (default value for functino parameters lost, fun position, ' statt ")
 
 test17.py...https://github.com/amitay/samba/blob/68ef3c48fc6df2396381af622140fbc2023bd81c/lib/dnspython/dns/rdtypes/IN/IPSECKEY.py#L76
 - No - (Starred after named parameter)

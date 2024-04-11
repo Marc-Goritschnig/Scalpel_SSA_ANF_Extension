@@ -695,6 +695,11 @@ def unwrap_inner_applications_let_structure(var: SSA_V | SSA_E_FUNC_CALL, inner,
                 if isinstance(arg, SSA_E_FUNC_CALL):
                     name = buffer_assignments[arg]
                     inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=arg), SA_V(arg), inner, ssa_node=arg))
+
+            if isinstance(var.name, SSA_E_FUNC_CALL):
+                name = buffer_assignments[var.name]
+                inner = unwrap_inner_applications_let_structure(var.name, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=var.name),
+                                                                               SA_V(var.name), inner, ssa_node=var.name))
     return inner
 
 
@@ -708,6 +713,10 @@ def unwrap_inner_applications_naming(var: SSA_V, unwrap_var: bool = False):
                 name = get_buffer_variable()
                 buffer_assignments[arg] = name
                 unwrap_inner_applications_naming(arg)
+        if isinstance(var.name, SSA_E_FUNC_CALL):
+            name = get_buffer_variable()
+            buffer_assignments[var.name] = name
+            unwrap_inner_applications_naming(var.name)
 
 
 # Transform values from SSA to ANF
@@ -722,7 +731,9 @@ def SA_V(var: SSA_V, can_be_buffered: bool = False):
         if can_be_buffered and var in buffer_assignments:
             return ANF_V_VAR(buffer_assignments[var], ssa_node=var)
         else:
-            return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par], ssa_node=par) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name), ssa_node=var)
+            return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par], ssa_node=par) if par in buffer_assignments else SA_V(par)) for par in var.args], ANF_V_VAR(buffer_assignments[var.name], ssa_node=var.name) if var.name in buffer_assignments else SA_V(var.name), ssa_node=var)
+            # unwrap_inner_applications_naming(var)
+            # return unwrap_inner_applications_let_structure(var, ANF_E_APP([(ANF_V_VAR(buffer_assignments[par], ssa_node=par) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name), ssa_node=var))
 
     return ANF_V_CONST('Not impl')
 

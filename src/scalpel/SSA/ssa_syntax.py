@@ -830,7 +830,7 @@ def preprocess_py_code(code):
                 lines[node.lineno - 1] = line[:node.col_offset] + ast.unparse(node.target) + value_str + line[node.end_col_offset:]
 
                 indentation = len(re.findall(r"^ *", line)[0])
-                new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-AnnAssign|' + node.annotation.id + '|' + str(node.simple)
+                new_code = (indentation * ' ') + ORIGINAL_COMMENT_MARKER + ' SSA-AnnAssign|' + ast.unparse(node.annotation) + '|' + str(node.simple)
                 lines.insert(node.lineno - 1, new_code)
                 code = '\n'.join(lines)
                 replaced = True
