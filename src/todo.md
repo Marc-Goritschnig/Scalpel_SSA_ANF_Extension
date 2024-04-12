@@ -1,7 +1,10 @@
 ## AST Nodes
-- Starred and double Starred operator
 - Classes
 - Async Nodes
+- Exception handling nodes
+- Global
+- NonLocal
+- Match
 - GeneratorExp
 - Subscript on left side of assignments
 
