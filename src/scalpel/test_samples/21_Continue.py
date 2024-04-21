@@ -3,5 +3,6 @@ for i in range(5):
         print('1')
         continue
     else:
-        print('2')
-    print('3')
+        continue
+for i in range(5):
+    continue

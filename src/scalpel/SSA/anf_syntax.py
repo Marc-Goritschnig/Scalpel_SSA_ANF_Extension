@@ -23,9 +23,10 @@ function_mapping_ext = {
     re.compile(r'^_Delete_([0-9])+$'): 'del %s',
     re.compile(r'^_new_tuple_([0-9])+$'): '(%s)',
     re.compile(r'^_new_set_([0-9])+$'): '{%s}',
-    re.compile(r'^_new_dict_([0-9])+$'): lambda params : '{' + ','.join([str(p) if i % 2 == 0 else (': ' + str(p)) for i, p in enumerate(params)]).replace(',:', ':') + '}'
+    re.compile(r'^_new_dict_([0-9])+$'): lambda params: '{' + ','.join(
+        [str(p) if i % 2 == 0 else (': ' + str(p)) for i, p in enumerate(params)]).replace(',:', ':') + '}'
 }
- #_Raise_ _Assert _Pass _Break _Continue _new_tuple_ _new_dict_ _new_set_ _new_list_ _List_Slice(LUS) _LSD_Get _str_format3 _ADD
+# _Raise_ _Assert _Pass _Break _Continue _new_tuple_ _new_dict_ _new_set_ _new_list_ _List_Slice(LUS) _LSD_Get _str_format3 _ADD
 function_mapping = {
     '_And': '(%s and %s)',
     '_Or': '(%s or %s)',
@@ -80,7 +81,6 @@ function_mapping = {
 # Global reference of the SSA AST to be transformed
 ssa_ast_global: SSA_AST = None
 
-
 # Buffer variables mapped to ANF nodes to replace more complex code due to only values being allowed to be used in function calls
 buffer_assignments = {}
 buffer_variable_counter = 0
@@ -88,14 +88,13 @@ buffer_variable_counter = 0
 # Keywords to be ignored when parsing ANF code due to special handling
 keywords = ['let', 'letrec', 'lambda', 'λ', 'unit', 'if', 'then', 'else', 'in']
 
-
 block_label_regex = r'^L([0-9]|_)*$'
 block_phi_assignment_vars = {}
 buffer_assignments_anf_ssa = {}
 
 
 def reset():
-    global ssa_ast_global,block_identifier,buffer_variable_counter,keywords,block_label_regex,buffer_assignments_anf_ssa,buffer_assignments,block_phi_assignment_vars
+    global ssa_ast_global, block_identifier, buffer_variable_counter, keywords, block_label_regex, buffer_assignments_anf_ssa, buffer_assignments, block_phi_assignment_vars
     ssa_ast_global = None
     buffer_assignments = {}
     buffer_variable_counter = 0
@@ -124,7 +123,7 @@ class ANFNode:
                         pos.end_col_offset = max(pos.end_col_offset, p.end_col_offset)
                     self.pos_info = pos
 
-    def print(self, lvl = 0):
+    def print(self, lvl=0):
         return 'not implemented'
 
     def enable_print_ascii(self):
@@ -153,11 +152,12 @@ class ANFNode:
             prov += PROV_INFO_EXT_CHAR + self.prov_info
         return prov
 
+
 class ANF_EV(ANFNode):
     def __init__(self, ssa_node: SSANode = None):
         super().__init__(ssa_node=ssa_node)
 
-    def print(self, lvl = 0):
+    def print(self, lvl=0):
         return ''
 
     def get_prov_info(self, prov_info):
@@ -171,7 +171,7 @@ class ANF_E(ANF_EV):
     def __init__(self, ssa_node: SSANode = None):
         super().__init__(ssa_node=ssa_node)
 
-    def print(self, lvl = 0):
+    def print(self, lvl=0):
         return ''
 
     def get_prov_info(self, prov_info):
@@ -179,6 +179,7 @@ class ANF_E(ANF_EV):
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return None
+
 
 class ANF_E_APP(ANF_E):
     def __init__(self, params: [ANF_V], name: ANF_V, ssa_node: SSANode = None, params_named: [str] = None):
@@ -190,38 +191,54 @@ class ANF_E_APP(ANF_E):
             if hasattr(ssa_node, 'params_named'):
                 self.params_named: [str] = ssa_node.params_named
 
-    def print(self, lvl = 0, prov_info: str = ''):
+    def print(self, lvl=0, prov_info: str = ''):
         return get_indentation(lvl) + f"{self.name.print(lvl)} {' '.join([var.print(lvl) for var in self.params])}"
 
     def get_prov_info(self, prov_info):
         name_info = ''
         if self.params_named is not None:
             name_info = PROV_INFO_EXT_CHAR + 'names=' + ','.join(self.params_named)
-        prov = 'f' + self.name.get_prov_info(None) + name_info + self.print_prov_ext() + (PROV_INFO_SPLIT_CHAR if len(self.params) > 0 else '') + PROV_INFO_SPLIT_CHAR.join([var.get_prov_info(None) for var in self.params])
+        prov = 'f' + self.name.get_prov_info(None) + name_info + self.print_prov_ext() + (
+            PROV_INFO_SPLIT_CHAR if len(self.params) > 0 else '') + PROV_INFO_SPLIT_CHAR.join(
+            [var.get_prov_info(None) for var in self.params])
         return prov.replace('ff', 'f')
+
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         out = None
         if isinstance(self.name, ANF_V_CONST):
             if self.name.is_block_id:
                 if self.name.value in assignments and self.name.value not in parsed_blocks:
                     parsed_blocks.append(self.name.value)
-                    out = assignments[self.name.value].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+                    out = assignments[self.name.value].parse_anf_to_python(assignments, parsed_blocks, loop_block_names,
+                                                                           lvl)
                     return postprocessing_ANF_V_to_python(self, out)
         elif isinstance(self.name, ANF_V_VAR):
             if self.name.name in function_mapping:
-                out = (function_mapping[self.name.name] % tuple([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+                out = (function_mapping[self.name.name] % tuple(
+                    [p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
             for (pattern, value) in function_mapping_ext.items():
                 if pattern.match(self.name.name):
                     if callable(value):
-                        out = value([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params])
+                        out = value([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in
+                                     self.params])
                     else:
-                        out = (value % ', '.join([p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in self.params]))
+                        out = (value % ', '.join(
+                            [p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for p in
+                             self.params]))
         if out is None:
             # Default output if nothing applies
-            out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([ (self.params_named[idx - (len(self.params) - len(self.params_named))] + '=' if self.params_named is not None and len(self.params) - idx <= len(self.params_named) else '') + p.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) for idx, p in enumerate(self.params)]) + ')'
+            out = self.name.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + '(' + ','.join([(
+                                                                                                                    self.params_named[
+                                                                                                                        idx - (
+                                                                                                                                    len(self.params) - len(
+                                                                                                                                self.params_named))] + '=' if self.params_named is not None and len(
+                                                                                                                        self.params) - idx <= len(
+                                                                                                                        self.params_named) else '') + p.parse_anf_to_python(
+                assignments, parsed_blocks, loop_block_names, 0) for idx, p in enumerate(self.params)]) + ')'
         lines = postprocessing_ANF_V_to_python(self, out).split('\n')
         lines = [get_indentation(lvl) + s for s in lines]
         return '\n'.join(lines)
+
 
 class ANF_E_COMM(ANF_E):
     def __init__(self, text: str, term: ANF_E, ssa_node: SSANode = None):
@@ -229,10 +246,10 @@ class ANF_E_COMM(ANF_E):
         self.text: str = text
         self.term: ANF_E = term
 
-    def print(self, lvl = 0, prov_info: str = ''):
-        #print('comm')
-        #print(self.text)
-        #print(get_indentation(lvl) + f"{self.text}\n{self.term.print(lvl)}")
+    def print(self, lvl=0, prov_info: str = ''):
+        # print('comm')
+        # print(self.text)
+        # print(get_indentation(lvl) + f"{self.text}\n{self.term.print(lvl)}")
 
         return get_indentation(lvl) + f"{self.text}\n{self.term.print(lvl)}"
 
@@ -241,11 +258,11 @@ class ANF_E_COMM(ANF_E):
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         out = self.term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
-        #if self.text.startswith('# SSA-'):
+        # if self.text.startswith('# SSA-'):
         #    out = out.split('\n')
         #    out = [out[0] + self.text] + out[1:]
         #    out = '\n'.join(out)
-        #else:
+        # else:
         out = get_indentation(lvl) + self.text + '\n' + out
         out = out.replace(NEW_COMMENT_MARKER, ORIGINAL_COMMENT_MARKER, 1)
         return post_processing_anf_to_python(out)
@@ -258,30 +275,40 @@ class ANF_E_LET(ANF_E):
         self.term1: ANF_E = term1
         self.term2: ANF_E = term2
 
-    def print(self, lvl = 0, prov_info: str = ''):
+    def print(self, lvl=0, prov_info: str = ''):
         next_lvl = lvl
-        #next_lvl = lvl + 1
-        #if isinstance(self.term2, ANF_E_LET) or isinstance(self.term2, ANF_E_IF) or isinstance(self.term2, ANF_E_COMM):
+        # next_lvl = lvl + 1
+        # if isinstance(self.term2, ANF_E_LET) or isinstance(self.term2, ANF_E_IF) or isinstance(self.term2, ANF_E_COMM):
         #    next_lvl = lvl
-        return get_indentation(lvl) + f"let {self.var.print(next_lvl)} = {self.term1.print(0)} in \n{self.term2.print(next_lvl)}"
+        return get_indentation(
+            lvl) + f"let {self.var.print(next_lvl)} = {self.term1.print(0)} in \n{self.term2.print(next_lvl)}"
 
     def get_prov_info(self, prov_info):
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.var.get_prov_info(
+            None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.term1.get_prov_info(
+            None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         name = self.var.name
         if name == '_':
             lines = self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names).split('\n')
             lines = [get_indentation(lvl) + s for s in lines]
-            return '\n'.join(lines) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+            return '\n'.join(lines) + '\n' + self.term2.parse_anf_to_python(assignments, parsed_blocks,
+                                                                            loop_block_names, lvl)
         elif self.var.is_buffer_var:
             assignments[name] = self.term1
             return self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         newline = '' if isinstance(self.term2, ANF_V_UNIT) else '\n'
-        out = get_indentation(lvl) + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + ' = ' + self.term1.parse_anf_to_python(assignments, parsed_blocks, loop_block_names) + newline + self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+        out = get_indentation(lvl) + self.var.parse_anf_to_python(assignments, parsed_blocks,
+                                                                  loop_block_names) + ' = ' + self.term1.parse_anf_to_python(
+            assignments, parsed_blocks, loop_block_names) + newline + self.term2.parse_anf_to_python(assignments,
+                                                                                                     parsed_blocks,
+                                                                                                     loop_block_names,
+                                                                                                     lvl)
         out = "\n".join([s for s in out.split("\n") if s])
         out = post_processing_anf_to_python(out)
         return out
+
 
 class ANF_E_LETREC(ANF_E):
     def __init__(self, terms: [ANF_EV], term2: ANF_E, ssa_node: SSANode = None):
@@ -291,20 +318,25 @@ class ANF_E_LETREC(ANF_E):
 
     def print(self, lvl=0, prov_info: str = ''):
         add_newline = '' if len(self.terms) == 0 else '\n'
-        return get_indentation(lvl) + 'letrec \n' + ('').join(letrec.print(lvl + 1) for letrec in self.terms) + (get_indentation(lvl) + 'in\n' + (self.term2.print(lvl + 1))) if self.term2 is not None else ''
+        return get_indentation(lvl) + 'letrec \n' + ('').join(letrec.print(lvl + 1) for letrec in self.terms) + (
+                    get_indentation(lvl) + 'in\n' + (self.term2.print(lvl + 1))) if self.term2 is not None else ''
 
     def get_prov_info(self, prov_info):
         add_newline = '' if len(self.terms) == 0 else '\n'
         return '\n' + ''.join([term.get_prov_info(None) for term in self.terms]) + '\n' + self.term2.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
-        out = '\n'.join(t for t in [term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) for term in self.terms] if len(t) > 0)
+        out = '\n'.join(t for t in
+                        [term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) for term in
+                         self.terms] if len(t) > 0)
         if self.term2 is not None:
             if isinstance(self.term2, ANF_E_FUNC):
-                out += get_next_non_function_term(self.term2).parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
+                out += get_next_non_function_term(self.term2).parse_anf_to_python(assignments, parsed_blocks,
+                                                                                  loop_block_names, lvl)
             else:
                 out += self.term2.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl)
         return post_processing_anf_to_python(out)
+
 
 class ANF_E_LETREC_ASS(ANF_E):
     def __init__(self, var: ANF_V, term1: ANF_EV, ssa_node: SSANode = None):
@@ -317,9 +349,11 @@ class ANF_E_LETREC_ASS(ANF_E):
         return get_indentation(lvl) + self.var.print(lvl + 1) + ' = ' + line_sep + self.term1.print(lvl + 1) + line_sep
 
     def get_prov_info(self, prov_info):
-        add_new_line = isinstance(self.term1, ANF_E_LETREC_ASS) or isinstance(self.term1, ANF_E_LET) or isinstance(self.term1, ANF_E_COMM)
+        add_new_line = isinstance(self.term1, ANF_E_LETREC_ASS) or isinstance(self.term1, ANF_E_LET) or isinstance(
+            self.term1, ANF_E_COMM)
         line_sep2 = '\n'
-        return self.var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term1.get_prov_info(None) + line_sep2
+        return self.var.get_prov_info(
+            None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term1.get_prov_info(None) + line_sep2
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if self.var.is_block_id:
@@ -329,8 +363,11 @@ class ANF_E_LETREC_ASS(ANF_E):
 
         vars = get_function_parameter_recursive(self.term1)
         next_term = get_next_non_function_term(self.term1)
-        out = get_indentation(lvl) + 'def ' + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + '(' + ','.join(vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1)
+        out = get_indentation(lvl) + 'def ' + self.var.parse_anf_to_python(assignments, parsed_blocks, loop_block_names,
+                                                                           lvl) + '(' + ','.join(
+            vars) + '):\n' + next_term.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl + 1)
         return post_processing_anf_to_python(out)
+
 
 def get_function_parameter_recursive(next):
     if isinstance(next, ANF_E_FUNC):
@@ -353,11 +390,14 @@ class ANF_E_IF(ANF_E):
         self.term_if: ANF_E = term_if
         self.term_else: ANF_E = term_else
 
-    def print(self, lvl = 0, prov_info: str = ''):
-        return get_indentation(lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
+    def print(self, lvl=0, prov_info: str = ''):
+        return get_indentation(
+            lvl) + f"if {self.test.print(0)} then \n{self.term_if.print(lvl + 1)} \n{get_indentation(lvl)}else\n{self.term_else.print(lvl + 1)}"
 
     def get_prov_info(self, prov_info):
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.test.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term_if.get_prov_info(None) + '\n' + self.print_prov_ext() + '\n' + self.term_else.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.test.get_prov_info(
+            None) + PROV_INFO_SPLIT_CHAR + self.print_prov_ext() + '\n' + self.term_if.get_prov_info(
+            None) + '\n' + self.print_prov_ext() + '\n' + self.term_else.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         parsed_blocks_buffer = parsed_blocks.copy()
@@ -375,13 +415,16 @@ class ANF_E_IF(ANF_E):
         goto1 = if_block_label.split('\n')[-1].strip().split('(')[0][1:]
         goto2 = else_block_label.split('\n')[-1].strip().split('(')[0][1:]
 
-        pattern = r'( )*continue\n( )*L[0-9]+\(.*\)'
+        # Loop that contains break or continue in main body
+        pattern = r'(.|\n)*(continue|break)\n( )*L[0-9]+\(.*\)(\n)*'
         is_if_with_only_continue_in_body = re.match(pattern, if_out) is not None
         # If the labels of gotos are i and i+1 it shows as the pattern which is generated when parsing a while loop
         # Otherwise it would be i and i+2 because the block i+1 would be after the if-else block
-        if (goto2 == '' or int(goto1) + 1 == int(goto2)) and ('L' + str(int(goto1) - 1) + '(' in if_out) and not is_if_with_only_continue_in_body:
+        if (goto2 == '' or int(goto1) + 1 == int(goto2)) and (
+                'L' + str(int(goto1) - 1) + '(' in if_out) and not is_if_with_only_continue_in_body:
             if_out = '\n'.join(if_out.split('\n')[0:-1])
-            return (get_indentation(lvl) + 'while ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) + ':\n'
+            return (get_indentation(lvl) + 'while ' + self.test.parse_anf_to_python(assignments, parsed_blocks,
+                                                                                    loop_block_names, lvl) + ':\n'
                     + if_out + '\n' + remove_indentation(else_out, 1) + '\n')
 
         # Prevent that the block after if-else gets printed into then if part - then print it separately after both parts
@@ -406,12 +449,16 @@ class ANF_E_IF(ANF_E):
             if_out = '\n'.join(if_lines[0:-1])
         if block_call_pattern.match(else_lines[-1].strip()):
             else_out = '\n'.join(else_lines[0:-1])
-        post_if_else = assignments['L' + str(int(goto1) + 1)].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl) if 'L' + str(int(goto1) + 1) in assignments else ''
+        post_if_else = assignments['L' + str(int(goto1) + 1)].parse_anf_to_python(assignments, parsed_blocks,
+                                                                                  loop_block_names, lvl) if 'L' + str(
+            int(goto1) + 1) in assignments else ''
 
         # If there is no content left in the else branch do not print any else content
-        else_out = '\n' if else_out == '' else ('\n' + get_indentation(lvl) + 'else:\n' + else_out + '\n' )
-        out = get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names, 0) + ':\n' + if_out + else_out + post_if_else
+        else_out = '\n' if else_out == '' else ('\n' + get_indentation(lvl) + 'else:\n' + else_out + '\n')
+        out = get_indentation(lvl) + 'if ' + self.test.parse_anf_to_python(assignments, parsed_blocks, loop_block_names,
+                                                                           0) + ':\n' + if_out + else_out + post_if_else
         return out
+
 
 class ANF_V(ANF_EV):
     def __init__(self, ssa_node: SSANode = None):
@@ -419,7 +466,7 @@ class ANF_V(ANF_EV):
         self.is_buffer_var: bool = False
         self.is_block_id: bool = False
 
-    def print(self, lvl = 0, prov_info: str = ''):
+    def print(self, lvl=0, prov_info: str = ''):
         return f""
 
     def get_prov_info(self, prov_info):
@@ -428,13 +475,14 @@ class ANF_V(ANF_EV):
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         return get_indentation(lvl) + 'ANF_V'
 
+
 class ANF_V_CONST(ANF_V):
     def __init__(self, value: str, ssa_node: SSANode = None, is_block_id: bool = False):
         super().__init__(ssa_node=ssa_node)
         self.value: str = value
         self.is_block_id = is_block_id
 
-    def print(self, lvl = 0, prov_info: str = ''):
+    def print(self, lvl=0, prov_info: str = ''):
         if self.prov_info == 'RET':
             return get_indentation(lvl) + f"{self.value}"
         else:
@@ -442,21 +490,23 @@ class ANF_V_CONST(ANF_V):
 
     def get_prov_info(self, prov_info):
         if self.is_block_id:
-             return 'lc' + self.print_prov_ext()
+            return 'lc' + self.print_prov_ext()
         return 'c' + self.print_prov_ext()
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
-        #value = normalize_name(self.value)
+        # value = normalize_name(self.value)
         val = self.value
-        #if isinstance(self.value, str):
+        # if isinstance(self.value, str):
         #    val = repr(self.value)[1:-1]
         return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, val)
+
 
 def postprocessing_ANF_V_to_python(n: ANFNode, out: str):
     if n.prov_info == 'RET':
         out = 'return ' + out
         return out.replace('return return', 'return')
     return out
+
 
 class ANF_V_VAR(ANF_V):
     def __init__(self, name: str, is_buffer_var: bool = False, is_block_id: bool = False, ssa_node: SSANode = None):
@@ -465,24 +515,27 @@ class ANF_V_VAR(ANF_V):
         self.is_buffer_var: bool = is_buffer_var
         self.is_block_id: bool = is_block_id
 
-    def print(self, lvl = 0, prov_info: str = ''):
+    def print(self, lvl=0, prov_info: str = ''):
         return f"{self.name}"
 
     def get_prov_info(self, prov_info):
         if self.is_block_id:
-             return 'lv' + self.print_prov_ext()
+            return 'lv' + self.print_prov_ext()
         return ('b' if self.is_buffer_var else '') + 'v' + self.print_prov_ext()
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         if self.name in assignments:
-            return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, assignments[self.name].parse_anf_to_python(assignments, parsed_blocks, loop_block_names, lvl))
+            return get_indentation(lvl) + postprocessing_ANF_V_to_python(self,
+                                                                         assignments[self.name].parse_anf_to_python(
+                                                                             assignments, parsed_blocks,
+                                                                             loop_block_names, lvl))
         name = normalize_name(self.name)
         return get_indentation(lvl) + postprocessing_ANF_V_to_python(self, name)
 
 
 def normalize_name(name: str):
     idx = name.rfind('_')
-    if not (re.match(r'.*_([0-9])+', name)) or idx == -1: # or name.startswith(SSA_BUFFER_VAR_NAME):
+    if not (re.match(r'.*_([0-9])+', name)) or idx == -1:  # or name.startswith(SSA_BUFFER_VAR_NAME):
         idx = len(name)
     return name[0:idx]
 
@@ -491,7 +544,7 @@ class ANF_V_UNIT(ANF_V):
     def __init__(self, ssa_node: SSANode = None):
         super().__init__(ssa_node)
 
-    def print(self, lvl = 0, prov_info: str = ''):
+    def print(self, lvl=0, prov_info: str = ''):
         return get_indentation(lvl) + "unit"
 
     def get_prov_info(self, prov_info):
@@ -507,21 +560,25 @@ class ANF_E_FUNC(ANF_E):
         self.input_var: ANF_V = input_var
         self.term: ANF_E = term
 
-    def print(self, lvl = 0, prov_info: str = ''):
+    def print(self, lvl=0, prov_info: str = ''):
         next_node = get_first_node_diff_than_comment(self.term)
-        add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(self.term, ANF_E_COMM)
+        add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(
+            self.term, ANF_E_COMM)
         line_sep = '\n' if add_new_line else ''
         if self.input_var is None:
             return get_indentation(lvl) + f"{font['lambda_sign']} . {line_sep}{self.term.print(lvl)}"
-        return get_indentation(lvl) + f"{font['lambda_sign']} {self.input_var.print(0)} . {line_sep}{self.term.print(lvl)}"
+        return get_indentation(
+            lvl) + f"{font['lambda_sign']} {self.input_var.print(0)} . {line_sep}{self.term.print(lvl)}"
 
     def get_prov_info(self, prov_info):
         next_node = get_first_node_diff_than_comment(self.term)
-        add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(self.term, ANF_E_COMM)
+        add_new_line = (not issubclass(type(next_node), ANF_V) or isinstance(next_node, ANF_V_UNIT)) or isinstance(
+            self.term, ANF_E_COMM)
         line_sep = '\n' if add_new_line else PROV_INFO_SPLIT_CHAR
         if self.input_var is None:
             return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
-        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.input_var.get_prov_info(None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
+        return self.print_prov_ext() + PROV_INFO_SPLIT_CHAR + self.input_var.get_prov_info(
+            None) + PROV_INFO_SPLIT_CHAR + line_sep + self.term.get_prov_info(None)
 
     def parse_anf_to_python(self, assignments, parsed_blocks, loop_block_names, lvl=0):
         # Not used_var_names
@@ -622,7 +679,8 @@ def SA_BS(b: SSA_B, is_block_id=True, first_scope=False):
 
     if first_scope:
         return ANF_E_LETREC(let_rec, b_terms)
-    return ANF_E_LETREC_ASS(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), ANF_E_LETREC(let_rec, b_terms))
+    return ANF_E_LETREC_ASS(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True),
+                            ANF_E_LETREC(let_rec, b_terms))
 
 
 def SA_BS2(bs: [SSA_B], is_block_id=True):
@@ -645,7 +703,9 @@ def SA_BS2(bs: [SSA_B], is_block_id=True):
             else:
                 b_terms = SA_ES(b, b.terms)
 
-            blocks_out.append(ANF_E_LETREC_ASS(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), b_terms, ssa_node=b))
+            blocks_out.append(
+                ANF_E_LETREC_ASS(ANF_V_CONST(block_identifier + b.label.label, ssa_node=b, is_block_id=True), b_terms,
+                                 ssa_node=b))
     return blocks_out
 
 
@@ -659,9 +719,13 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
 
     if isinstance(term, SSA_E_ASS):
         unwrap_inner_applications_naming(term.value)
-        return unwrap_inner_applications_let_structure(term.value, ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:]), ssa_node=term))
+        return unwrap_inner_applications_let_structure(term.value,
+                                                       ANF_E_LET(SA_V(term.var), SA_V(term.value), SA_ES(b, terms[1:]),
+                                                                 ssa_node=term))
     if isinstance(term, SSA_E_GOTO):
-        return ANF_E_APP([SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label))], ANF_V_CONST(block_identifier + term.label.label, ssa_node=term, is_block_id=True), ssa_node=term)
+        return ANF_E_APP(
+            [SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label))],
+            ANF_V_CONST(block_identifier + term.label.label, ssa_node=term, is_block_id=True), ssa_node=term)
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
     if isinstance(term, SSA_E_RET):
@@ -673,10 +737,14 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
         return unwrap_inner_applications_let_structure(term.value, x)
     if isinstance(term, SSA_E_IF_ELSE):
         unwrap_inner_applications_naming(term.test, True)
-        return unwrap_inner_applications_let_structure(term.test, ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]), SA_ES(b, [term.term_else]), ssa_node=term), True)
+        return unwrap_inner_applications_let_structure(term.test,
+                                                       ANF_E_IF(SA_V(term.test, True), SA_ES(b, [term.term_if]),
+                                                                SA_ES(b, [term.term_else]), ssa_node=term), True)
     if isinstance(term, SSA_E_FUNC_CALL):
         unwrap_inner_applications_naming(term)
-        return unwrap_inner_applications_let_structure(term, ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:]), ssa_node=term))
+        return unwrap_inner_applications_let_structure(term,
+                                                       ANF_E_LET(ANF_V_CONST('_'), SA_V(term), SA_ES(b, terms[1:]),
+                                                                 ssa_node=term))
     if issubclass(type(term), SSA_E_COMM):
         return ANF_E_COMM(term.text, SA_ES(b, terms[1:]), ssa_node=term)
     if issubclass(type(term), SSA_V):
@@ -689,17 +757,21 @@ def unwrap_inner_applications_let_structure(var: SSA_V | SSA_E_FUNC_CALL, inner,
     if isinstance(var, SSA_E_FUNC_CALL):
         if unwrap_var:
             name = buffer_assignments[var]
-            inner = unwrap_inner_applications_let_structure(var, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=var), SA_V(var), inner, ssa_node=var))
+            inner = unwrap_inner_applications_let_structure(var,
+                                                            ANF_E_LET(ANF_V_VAR(name, True, ssa_node=var), SA_V(var),
+                                                                      inner, ssa_node=var))
         else:
             for arg in var.args:
                 if isinstance(arg, SSA_E_FUNC_CALL):
                     name = buffer_assignments[arg]
-                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=arg), SA_V(arg), inner, ssa_node=arg))
+                    inner = unwrap_inner_applications_let_structure(arg, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=arg),
+                                                                                   SA_V(arg), inner, ssa_node=arg))
 
             if isinstance(var.name, SSA_E_FUNC_CALL):
                 name = buffer_assignments[var.name]
-                inner = unwrap_inner_applications_let_structure(var.name, ANF_E_LET(ANF_V_VAR(name, True, ssa_node=var.name),
-                                                                               SA_V(var.name), inner, ssa_node=var.name))
+                inner = unwrap_inner_applications_let_structure(var.name,
+                                                                ANF_E_LET(ANF_V_VAR(name, True, ssa_node=var.name),
+                                                                          SA_V(var.name), inner, ssa_node=var.name))
     return inner
 
 
@@ -731,7 +803,11 @@ def SA_V(var: SSA_V, can_be_buffered: bool = False):
         if can_be_buffered and var in buffer_assignments:
             return ANF_V_VAR(buffer_assignments[var], ssa_node=var)
         else:
-            return ANF_E_APP([(ANF_V_VAR(buffer_assignments[par], ssa_node=par) if par in buffer_assignments else SA_V(par)) for par in var.args], ANF_V_VAR(buffer_assignments[var.name], ssa_node=var.name) if var.name in buffer_assignments else SA_V(var.name), ssa_node=var)
+            return ANF_E_APP(
+                [(ANF_V_VAR(buffer_assignments[par], ssa_node=par) if par in buffer_assignments else SA_V(par)) for par
+                 in var.args],
+                ANF_V_VAR(buffer_assignments[var.name], ssa_node=var.name) if var.name in buffer_assignments else SA_V(
+                    var.name), ssa_node=var)
             # unwrap_inner_applications_naming(var)
             # return unwrap_inner_applications_let_structure(var, ANF_E_APP([(ANF_V_VAR(buffer_assignments[par], ssa_node=par) if par in buffer_assignments else SA_V(par)) for par in var.args], SA_V(var.name), ssa_node=var))
 
@@ -750,7 +826,9 @@ def print_anf_with_prov_info(anf_parent: ANFNode):
     out = trim_double_spaces(anf_parent.print(), NEW_COMMENT_MARKER)
     prov = anf_parent.get_prov_info(None)
     max_chars = max([len(line) + line.count('\t') * 3 for line in out.split('\n')]) + 2
-    return '\n'.join([line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + PROV_INFO_MARKER + info for line, info in zip(out.split('\n'), prov.split('\n'))])
+    return '\n'.join(
+        [line + (max_chars - len(line) - line.count('\t') * 3) * ' ' + PROV_INFO_MARKER + info for line, info in
+         zip(out.split('\n'), prov.split('\n'))])
 
 
 # Read anf code and parse it into internal ANF AST representation
@@ -759,14 +837,18 @@ def parse_anf_from_text(code: str):
     lines = code.split('\n')
     a = [tuple(line.rsplit(PROV_INFO_MARKER, 1)) for line in lines]
     code_lines, info_lines = zip(*[tuple(line.rsplit(PROV_INFO_MARKER, 1)) for line in lines])
-    code_lines = [line if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else trim_double_spaces(line, NEW_COMMENT_MARKER) for line in code_lines]
+    code_lines = [
+        line if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else trim_double_spaces(line, NEW_COMMENT_MARKER) for
+        line in code_lines]
     code_words = []
 
     for line in code_lines:
-        #a = repr(line.strip())[1:-1]
-        #x = re.split(r"(?<!\\)(?:\\\\)*'", repr(line.strip())[1:-1])
-        #for i, part in enumerate([line.strip()] if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else re.split(r"(?<!\\\\)(?:\\\\\\\\)*'", repr(line.strip())[1:-1])):
-        for i, part in enumerate([line.strip()] if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else re.split(r"(?<!\\)'", line.strip())):
+        # a = repr(line.strip())[1:-1]
+        # x = re.split(r"(?<!\\)(?:\\\\)*'", repr(line.strip())[1:-1])
+        # for i, part in enumerate([line.strip()] if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else re.split(r"(?<!\\\\)(?:\\\\\\\\)*'", repr(line.strip())[1:-1])):
+        for i, part in enumerate(
+                [line.strip()] if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, line) else re.split(r"(?<!\\)'",
+                                                                                               line.strip())):
             if i % 2 == 1 or part != ' ':
                 for j, word in enumerate(
                         [part] if re.match(r'^(\s)*' + NEW_COMMENT_MARKER, part) else part.strip().split(' ')):
@@ -777,8 +859,10 @@ def parse_anf_from_text(code: str):
                         break
 
     # code_words = list(filter(lambda e: e is not None, code_words))
-    aa = parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in line.strip().split(PROV_INFO_SPLIT_CHAR)])
+    aa = parse_anf_e_from_code(code_words, [info_word for line in info_lines for info_word in
+                                            line.strip().split(PROV_INFO_SPLIT_CHAR)])
     return aa
+
 
 # Convert an ANF code expression to ANF AST
 def parse_anf_e_from_code(code_words, info_words):
@@ -800,16 +884,16 @@ def parse_anf_e_from_code(code_words, info_words):
         blocks = []
         in_idx = get_other_section_part_idx(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         inside = 0
-        while len(code_words) > i+2 and i < in_idx:
+        while len(code_words) > i + 2 and i < in_idx:
             if code_words[i] == 'let' or (code_words[i] == 'letrec' and i > 0):
                 inside += 1
             elif code_words[i] == 'in':
                 inside -= 1
-            elif inside == 0 and code_words[i] != 'let' and code_words[i+2] == '=':
-                #Find start of next assignment or end at the 'in' area
+            elif inside == 0 and code_words[i] != 'let' and code_words[i + 2] == '=':
+                # Find start of next assignment or end at the 'in' area
                 i2 = i + 1
                 inside2 = 0
-                while len(code_words) > i2+2 and i2 < in_idx + 1:
+                while len(code_words) > i2 + 2 and i2 < in_idx + 1:
                     if code_words[i2] == 'let' or code_words[i2] == 'letrec':
                         inside2 += 1
                     elif code_words[i2] == 'in':
@@ -818,14 +902,15 @@ def parse_anf_e_from_code(code_words, info_words):
                         i2 += 1
                         break
                     i2 += 1
-                block = parse_anf_e_from_code(code_words[i+1:i2], info_words[i+1:i2])
+                block = parse_anf_e_from_code(code_words[i + 1:i2], info_words[i + 1:i2])
                 blocks.append(block)
             i += 1
         _in = get_other_section_part(code_words[1:], info_words[1:], ['let', 'letrec'], ['in'])
         return ANF_E_LETREC(blocks, _in)
     if len(code_words) > 1 and code_words[1] == '=':
         # assign within letrec
-        variable = ANF_V_VAR(code_words[0], info0_parts[0] == 'bv', is_block_id=info0_parts[0] == 'lc' or info0_parts[0] == 'lv')
+        variable = ANF_V_VAR(code_words[0], info0_parts[0] == 'bv',
+                             is_block_id=info0_parts[0] == 'lc' or info0_parts[0] == 'lv')
         right = parse_anf_e_from_code(code_words[2:], info_words[2:])
         return ANF_E_LETREC_ASS(variable, right)
     if next_word == 'unit':
@@ -864,7 +949,8 @@ def parse_anf_e_from_code(code_words, info_words):
                     parts2.append(part)
             info_words[0] = PROV_INFO_EXT_CHAR.join(parts2)
 
-        n = ANF_E_APP([parse_anf_v_from_code(code_words[i], info_words[i]) for i in range(1, count)], parse_anf_v_from_code(code_words[0], info_words[0][1:]), params_named=names)
+        n = ANF_E_APP([parse_anf_v_from_code(code_words[i], info_words[i]) for i in range(1, count)],
+                      parse_anf_v_from_code(code_words[0], info_words[0][1:]), params_named=names)
         info_word_parts = info_words[0][1:].split(PROV_INFO_EXT_CHAR)
         if n is not None and len(info_word_parts) > 1:
             n.prov_info = info_word_parts[len(info_word_parts) - 1]
@@ -945,7 +1031,8 @@ def post_processing_anf_to_python(code):
         line = lines[i]
         line_strip = line.strip()
         if ORIGINAL_COMMENT_MARKER + ' SSA-AugAssign' in line:
-            output += re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.)\s*(.*)', r'\1 \3= \2\4', lines[i + 1]) + '\n'
+            a, b, c, d = re.sub(r'(\w+)\s*=\s*(|.)\1\s*(.{1,2})\s*(.*)', r'\1;\2;\3;\4', lines[i + 1]).split(';')
+            output += f'{a} {c.strip()}= {b}{d}\n'
             skip = 1
         elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-ForTuple'):
             lines[i] = ''
@@ -989,9 +1076,12 @@ def post_processing_anf_to_python(code):
                 if i + j + j2 < len(lines):
                     target_indentation = indentation + 4
                     if fun_end_idx == 0:
-                        lines = lines[i + j:i+j+j2] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:i+j-1]] + lines[i+j+j2:]
+                        lines = lines[i + j:i + j + j2] + [(' ' * target_indentation) + line for line in
+                                                           [lines[i - 1]] + lines[i + 1:i + j - 1]] + lines[i + j + j2:]
                     else:
-                        lines = lines[fun_end_idx:i+j+j2] + [(' ' * target_indentation) + line for line in [lines[i-1]] + lines[i+1:fun_end_idx]] + lines[i+j+j2:]
+                        lines = lines[fun_end_idx:i + j + j2] + [(' ' * target_indentation) + line for line in
+                                                                 [lines[i - 1]] + lines[i + 1:fun_end_idx]] + lines[
+                                                                                                              i + j + j2:]
                     out = '\n'.join(output.split('\n')[:-2]) + post_processing_anf_to_python('\n'.join(lines))
                     return out
                 else:
@@ -1009,11 +1099,11 @@ def post_processing_anf_to_python(code):
             lines[i] = ''
         elif ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptMultiDim-' in line:
             info = lines[i].split('SSA-SubscriptMultiDim-')[1]
-            #var, count = info.split('-')
-            #line = lines[i + 1]
-            #pattern = re.escape(var) + r'\[[^\]]*\]' * int(count)
-            #content = re.search(pattern, line).group(0)
-            #line = line.replace(content, content.replace('][', ','))
+            # var, count = info.split('-')
+            # line = lines[i + 1]
+            # pattern = re.escape(var) + r'\[[^\]]*\]' * int(count)
+            # content = re.search(pattern, line).group(0)
+            # line = line.replace(content, content.replace('][', ','))
             line = replaceSpaces(lines[i + 1], ORIGINAL_COMMENT_MARKER)
             line = line.replace(info, info.replace('][', ','))
             lines[i + 1] = line
@@ -1059,7 +1149,8 @@ def post_processing_anf_to_python(code):
             lines[i + 2] = lines[i + 2].replace(var, val)
         elif ORIGINAL_COMMENT_MARKER + ' SSA-NamedExpr' in line:
             var, val = re.sub(r'^ *(.*) = (.*)', r'\1;\2', lines[i + 1]).split(';')
-            start, var_part, end = re.sub(r'(.*)(([^a-zA-z]|^)' + var + '([^a-zA-z]|$))(.*)', r'\1;\2;\5', lines[i + 2]).split(';')
+            start, var_part, end = re.sub(r'(.*)(([^a-zA-z]|^)' + var + '([^a-zA-z]|$))(.*)', r'\1;\2;\5',
+                                          lines[i + 2]).split(';')
             lines[i + 2] = start + var_part.replace(var, '(' + var + ' := ' + val + ')') + end
             skip = 1
         elif ORIGINAL_COMMENT_MARKER + ' SSA-Tuple' in line:
@@ -1070,9 +1161,9 @@ def post_processing_anf_to_python(code):
             while (var + '[') in lines[i + j]:
                 vars.append(lines[i + j].split(' = ')[0].strip())
                 j += 1
-            #parenthesis = line_strip.split(ORIGINAL_COMMENT_MARKER + ' SSA-Tuple')[1]
-            #part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
-            #part2 = '(' + value + ')' if parenthesis[1] == '1' else value
+            # parenthesis = line_strip.split(ORIGINAL_COMMENT_MARKER + ' SSA-Tuple')[1]
+            # part1 = '(' + ', '.join(vars) + ')' if parenthesis[0] == '1' else ', '.join(vars)
+            # part2 = '(' + value + ')' if parenthesis[1] == '1' else value
             part1 = ', '.join(vars)
             part2 = value
             output += indentation * ' ' + part1 + ' = ' + part2 + '\n'
@@ -1116,7 +1207,8 @@ def post_processing_anf_to_python(code):
                 skip = 1
             output += lines[i] + '\n'
         elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-SubscriptSet'):
-            indentation, var, subscript, value = re.sub(r'^( *)(.*) = .*\((.*),(.*),(.*)\).*', r'\1;\2;\4;\5', lines[i + 1]).split(';')
+            indentation, var, subscript, value = re.sub(r'^( *)(.*) = .*\((.*),(.*),(.*)\).*', r'\1;\2;\4;\5',
+                                                        lines[i + 1]).split(';')
             output += indentation + var + '[' + subscript + '] = ' + value + '\n'
             skip = 1
         elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-AnnAssign'):
@@ -1138,7 +1230,11 @@ def post_processing_anf_to_python(code):
                 j += 1
                 if i + j == len(lines):
                     break
-            loop_body = lines[i + 5:j-1]
+            # For loop without brak in main body
+            if 'next(_SSA_' in lines[j - 1]:
+                loop_body = lines[i + 5:j - 1]
+            else:  # For loop with break in main body (no next assignment at end of loop body)
+                loop_body = lines[i + 5:j]
 
             code_after = []
             if i + j < len(lines):
@@ -1148,12 +1244,12 @@ def post_processing_anf_to_python(code):
             return output + post_processing_anf_to_python('\n'.join(lines))
         elif ORIGINAL_COMMENT_MARKER + ' SSA-IfExp' in line:
             indentation = len(re.findall(r"^ *", lines[i + 2])[0])
-            if_term = re.sub(r'^(.*)if (.*):(.)*', r'\2',lines[i + 1])
-            ssa_var, if_val = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2',lines[i + 2]).split(';')
+            if_term = re.sub(r'^(.*)if (.*):(.)*', r'\2', lines[i + 1])
+            ssa_var, if_val = re.sub(r'^ *(.*)\s=\s(.*)', r'\1;\2', lines[i + 2]).split(';')
             j = 3
             while not (lines[i + j].startswith(indentation * ' ' + ssa_var)):
                 j += 1
-            else_block = [line[4:] for line in lines[i+6:i+j]]
+            else_block = [line[4:] for line in lines[i + 6:i + j]]
             else_val = re.sub(r'^ *(.*)\s=\s(.*)', r'\2', lines[i + j])
             j += 1
             while not (lines[i + j].startswith((indentation - 4) * ' ') and ssa_var in lines[i + j]):
@@ -1164,13 +1260,14 @@ def post_processing_anf_to_python(code):
             line = lines[i + j].replace(ssa_var, if_exp)
 
             code_after = []
-            if i+j+1 < len(lines):
-                code_after = lines[i+j+1:]
+            if i + j + 1 < len(lines):
+                code_after = lines[i + j + 1:]
 
             lines = [line] + else_block + code_after
             return output + post_processing_anf_to_python('\n'.join(lines))
         elif line_strip.startswith(ORIGINAL_COMMENT_MARKER + ' SSA-Attribute'):
-            indentation, buffer, type, attr, var = re.sub(r'^( *)(.*) = _obj(2|)_(' + VAR_NAME_REGEX + ')\((.*)\)$', r'\1;\2;\3;\4;\5', lines[i + 1]).split(';')
+            indentation, buffer, type, attr, var = re.sub(r'^( *)(.*) = _obj(2|)_(' + VAR_NAME_REGEX + ')\((.*)\)$',
+                                                          r'\1;\2;\3;\4;\5', lines[i + 1]).split(';')
             params = ''
             # TODO Search for commans not within parenthesis, meaning there are multiple variables
             parts = split_at_comma(var)
@@ -1194,6 +1291,7 @@ def post_processing_anf_to_python(code):
         else:
             output += line + ('' if (i == len(lines) - 1 and line == '') else '\n')
     return output
+
 
 def split_at_comma(string):
     result = []
@@ -1221,6 +1319,7 @@ def split_at_comma(string):
 
     return result
 
+
 def extract_main_parenthesis(input):
     indentation = 0
     start = 0
@@ -1233,5 +1332,5 @@ def extract_main_parenthesis(input):
             indentation -= 1
             if indentation == 0:
                 if len(input) > i + 1:
-                    return input[:start], input[start:i], input[i+1:]
+                    return input[:start], input[start:i], input[i + 1:]
                 return input[:start], input[start:i], ''

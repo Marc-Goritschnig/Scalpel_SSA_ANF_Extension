@@ -24,8 +24,8 @@ operator_map = {
     ast.Div: '/',
     ast.Mod: '%',
     ast.Pow: '**',
-    ast.LShift: '<',
-    ast.RShift: '>',
+    ast.LShift: '<<',
+    ast.RShift: '>>',
     ast.BitOr: '|',
     ast.BitXor: '^',
     ast.BitAnd: '&',
@@ -1201,9 +1201,13 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     old_iter_var = PS_E(prov_info, block, stmt.target, 0, False)
     if hasattr(old_iter_var.name, 'name'):
         var_name, idx = old_iter_var.name.name.rsplit('_', 1)
+        if idx == '0':
+            idx = str(int(idx) + 2)
         old_iter_var.name.name = var_name + '_' + str(int(idx) - 1)
     else:
         var_name, idx = old_iter_var.name.rsplit('_', 1)
+        if idx == '0':
+            idx = str(int(idx) + 2)
         old_iter_var.name = var_name + '_' + str(int(idx) - 1)
     old_iter_var2 = PS_E(prov_info, block, stmt.target, 0, False)
     if hasattr(old_iter_var.name, 'name'):
