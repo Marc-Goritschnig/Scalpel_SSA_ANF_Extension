@@ -1072,7 +1072,7 @@ def PS_PHI(curr_block):
         var_name = list(stored.keys())[0]
         var_nr = str(stored[var_name])
         var_values = list(map(str, list(loaded[var_name])))
-        assignments.append(SSA_E_ASS_PHI(SSA_V_VAR(var_name + '_' + var_nr), [SSA_V_VAR(var_name + '_' + var) for var in var_values]))
+        assignments.append(SSA_E_ASS_PHI(SSA_V_VAR(var_name + '_' + var_nr), [SSA_V_VAR(var_name + '_' + var) for var in var_values if var != var_nr]))
 
     return assignments
 
@@ -1193,6 +1193,7 @@ def PS_FOR(prov_info, block_ref, block, stmt, first_in_proc):
     new_block_name = block_ref.label + '_2'
 
     stmts = []
+    stmts = PS_PHI(block)
     iter_var = get_buffer_var() + '_0'
     if isinstance(stmt.iter, ast.Name) and stmt.iter.id.startswith(SSA_BUFFER_VAR_NAME):
         stmt.iter.id += '_0'

@@ -1,3 +1,8 @@
+
 a = 1
-a = 2 if a else 3
-print(a)
+if a:
+    a = 2
+for i in range(a,11):
+    print(1)
+
+print(2)
