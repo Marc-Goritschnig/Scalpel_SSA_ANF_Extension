@@ -1,8 +1,7 @@
-
 a = 1
-if a:
+if test:
+    b = 1
     a = 2
-for i in range(a,11):
-    print(1)
-
-print(2)
+    if test:
+        b = 2
+print(a)

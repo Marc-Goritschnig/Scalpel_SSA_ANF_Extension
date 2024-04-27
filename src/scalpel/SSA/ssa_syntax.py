@@ -457,7 +457,7 @@ def get_phi_vars_in_block(b: SSA_B) -> [str]:
     return phi_vars
 
 
-def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B) -> [str]:
+def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B, ssa_ast: SSA_AST) -> [str]:
     var_names = []
     vars_for_jump = []
 
@@ -467,8 +467,8 @@ def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B) -> [str]:
             var_names.append(e.var.print(0))
 
     # Go over all phi assignments in the target block
-    found = False
     for e in b_to.terms:
+        found = False
         if isinstance(e, SSA_E_ASS_PHI):
             # If one of the variables was assigned in the from block we use it as parameter for the jump
             for phi_var in e.args:
@@ -476,16 +476,23 @@ def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B) -> [str]:
                     found = True
                     vars_for_jump.append(phi_var)
             # If the variable was not found it was not set in this branch and we have to use the variable from the
-            # parent branch which corresponds to the smallest post index of the variables in e.args
-            min_val = 99999
-            var_found = ''
+            # predecessor blocks (if not found again, we serach through the pred. of the pred. etc.)
             if not found:
-                for v in e.args:
-                    val = int(v.print(0).split('_')[-1])
-                    if val < min_val:
-                        min_val = val
-                        var_found = v
-                vars_for_jump.append(var_found)
+                for bl in get_block_list_from_parent_block(ssa_ast.blocks[0]):
+                    is_predecessor = False
+                    for bl2 in bl.blocks:
+                        if bl2.label.label == b_from.label.label:
+                            is_predecessor = True
+                    if is_predecessor:
+                        res = get_phi_vars_for_jump(bl, b_to, ssa_ast)
+                        if len(res) > 0:
+                            for var in res:
+                                if var.name.rsplit('_')[0] == e.var.name.rsplit('_')[0]:
+                                    vars_for_jump.append(var)
+                            found = True
+
+            if not found:
+                vars_for_jump.append(SSA_V_VAR(None))
 
     # return parameters for the jump
     return vars_for_jump
@@ -497,6 +504,13 @@ def get_first_block_in_proc(blocks: [SSA_B]):
     #        return b
     return blocks[0]
 
+
+def get_block_list_from_parent_block(block: SSA_B, blocks = []):
+    for b in block.blocks:
+        if b not in blocks:
+            blocks.append(b)
+            get_block_list_from_parent_block(b, blocks)
+    return blocks
 
 # Custom class to mock a cfg block
 class CFGBlockMock:

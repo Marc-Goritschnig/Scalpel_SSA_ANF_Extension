@@ -306,7 +306,7 @@ class SSA:
             # Preset variables for phi assignments in upcoming blocks
             for phi_var in block_phi_variables_needed[block.id]:
                 stmt_renamed_loaded = {}
-                stmt_renamed_loaded[phi_var] = self.recursive_find_var_usages_in_predecessors(phi_var, block_renamed_stored, block_renamed_phi_stored, block.predecessors)
+                stmt_renamed_loaded[phi_var] = list(self.recursive_find_var_usages_in_predecessors(phi_var, block_renamed_stored, block_renamed_phi_stored, block.predecessors))
                 # Phi assignment is only needed if there are multiple possible values, not for example there is an if statement where a local variable is used and not set before the if block
                 if len(stmt_renamed_loaded[phi_var]) > 1:
                     block_renamed_phi_loaded[block.id] += [stmt_renamed_loaded]
@@ -340,7 +340,7 @@ class SSA:
 
 
     def recursive_find_var_usages_in_predecessors(self, var_searched, block_renamed_stored, block_renamed_phi_stored, predecessors, searched_preds = []):
-        nrs = []
+        nrs = set()
 
         for pred in predecessors:
             if pred in searched_preds:
@@ -355,9 +355,9 @@ class SSA:
                             highest_nr = var_dict[var]
 
             if highest_nr >= 0: # found an entry
-                nrs.append(highest_nr)
+                nrs.add(highest_nr)
             else:
-                nrs += self.recursive_find_var_usages_in_predecessors(var_searched, block_renamed_stored, block_renamed_phi_stored, pred.predecessors, searched_preds + predecessors)
+                nrs.union(self.recursive_find_var_usages_in_predecessors(var_searched, block_renamed_stored, block_renamed_phi_stored, pred.predecessors, searched_preds + predecessors))
         return nrs
 
 

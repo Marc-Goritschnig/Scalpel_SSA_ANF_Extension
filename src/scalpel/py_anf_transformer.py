@@ -253,6 +253,21 @@ if __name__ == '__main__':
     #    from staticfg import CFGBuilder
     #    graphviz_path = 'C:/Program Files/Graphviz/bin'
     #    os.environ["PATH"] += os.pathsep + graphviz_path
+#    code_str = """
+#a = 1
+## SSA-IfExp
+#if test:
+#    _SSA_0 = 2
+#else:
+#    _SSA_0 = 3
+#a = _SSA_0
+#print(a)"""
+    # Parse the code string to generate an AST
+    # ast_tree = ast.parse(code_str)
+    # Build the CFG from the AST
+    # builder = CFGBuilder()
+    # cfg = builder.build('test', ast_tree)
+    # cfg.build_visual('exampleCFG', 'pdf')
 
     transform()
 

@@ -724,7 +724,7 @@ def SA_ES(b: SSA_B, terms: [SSA_E]):
                                                                  ssa_node=term))
     if isinstance(term, SSA_E_GOTO):
         return ANF_E_APP(
-            [SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label))],
+            [SA_V(arg) for arg in get_phi_vars_for_jump(b, get_block_by_id(ssa_ast_global, term.label.label), ssa_ast_global)],
             ANF_V_CONST(block_identifier + term.label.label, ssa_node=term, is_block_id=True), ssa_node=term)
     if isinstance(term, SSA_E_ASS_PHI):
         return SA_ES(b, terms[1:])
