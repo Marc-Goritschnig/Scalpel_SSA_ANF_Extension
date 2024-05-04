@@ -489,8 +489,9 @@ def get_phi_vars_for_jump(b_from: SSA_B, b_to: SSA_B, ssa_ast: SSA_AST) -> [str]
                             for var in res:
                                 if var.name.rsplit('_')[0] == e.var.name.rsplit('_')[0]:
                                     vars_for_jump.append(var)
-                            found = True
+                                    found = True
 
+            # If we did not find any assignment the variable was not set in this path and should be None
             if not found:
                 vars_for_jump.append(SSA_V_VAR(None))
 
